@@ -1,6 +1,9 @@
 from contextlib import asynccontextmanager
+from pathlib import Path
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 
 from backend.config import settings
 from backend.database import init_db
@@ -8,8 +11,9 @@ from backend.api.router import router
 from backend.log_handler import setup_logging
 from backend.scheduler.jobs import start_scheduler, stop_scheduler, get_scheduler_info
 
-# Logging so früh wie möglich initialisieren
 setup_logging()
+
+FRONTEND_DIST = Path(__file__).parent.parent / "frontend" / "dist"
 
 
 @asynccontextmanager
@@ -43,3 +47,15 @@ def health():
         "status":    "ok",
         "scheduler": get_scheduler_info(),
     }
+
+
+# Gebautes Frontend ausliefern (nach `npm run build`)
+if FRONTEND_DIST.exists():
+    app.mount("/assets", StaticFiles(directory=FRONTEND_DIST / "assets"), name="assets")
+
+    @app.get("/{full_path:path}", include_in_schema=False)
+    def serve_spa(full_path: str):
+        file = FRONTEND_DIST / full_path
+        if file.is_file():
+            return FileResponse(file)
+        return FileResponse(FRONTEND_DIST / "index.html")
