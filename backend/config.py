@@ -23,6 +23,7 @@ class Settings(BaseSettings):
 
     backend_host: str = "127.0.0.1"
     backend_port: int = 8000
+    frontend_port: int = 5173
     cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
 
     @property
