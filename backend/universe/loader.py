@@ -1,17 +1,30 @@
-"""Universum-Loader: ~850+ US-Aktien.
+"""Universum-Loader: ~850+ US-Aktien + optional DAX 40.
 
 Aufbau (Priorität):
-  1. Vollständige S&P 500 + NASDAQ 100 + Russell 2000 Top-200 (hardkodiert, Stand Q1 2025)
-  2. Wikipedia-Fetch bei Internetverbindung (automatische Aktualisierung)
-  3. Alpha Vantage LISTING_STATUS als Erweiterung (einmaliger Call pro Woche)
-  4. StockTwits Trending (täglich, wird durch scheduler.py ergänzt)
-  5. Persönliche Watchlist (manuell)
+  1. S&P 500 + NASDAQ 100 + Russell 200 + S&P 400 Mid Cap + DAX 40 (hardkodiert, Stand Q1 2025)
+  2. Wikipedia-Fetch bei Internetverbindung → hält Listen automatisch aktuell (wöchentlich)
+  3. Alpha Vantage LISTING_STATUS → NYSE/NASDAQ-Reserve (wöchentlich, 1 Credit)
+  4. StockTwits Trending (täglich, durch scheduler.py ergänzt)
+  5. Persönliche Watchlist (manuell via API oder direkt)
 
-Scan-Strategie:
+Scan-Strategie (Mindestfrequenz: alle Aktien ≥ 1x/Woche):
   Tier 0 – gehaltene Positionen:   täglich, alle APIs
   Tier 1 – Zone 1+2 (~150):        täglich, alle APIs
   Tier 2 – Zone 3 (~200):          täglich, yfinance+ta+StockTwits (keine Quota-APIs)
-  Tier 3 – Zone 4 (~500+):         200/Tag rotierend → alle ~2–3 Tage vollständig, yfinance only
+  Tier 3 – Zone 4 (~500+):         200/Tag rotierend (konfigurierbar)
+                                    → 500 Aktien / 200 pro Tag = 2,5 Tage
+                                    → bis 1.400 Zone-4-Aktien wöchentlich garantiert
+
+Aktualisierung der Index-Listen:
+  - Automatisch: wöchentlich sonntags 02:00 UTC via Wikipedia-Fetch (scheduler.py)
+  - Manuell: POST /api/universe/refresh (Frontend-Button auf Konfig-Seite)
+  - Hardkodierte Listen: Stand Q1 2025 (Fallback wenn kein Internetzugang)
+
+DAX-Hinweis:
+  Deutsche Aktien werden mit .DE-Suffix gespeichert (SAP.DE, SIE.DE).
+  yfinance unterstützt .DE; alle relativen Berechnungen (RSI, VCP, Momentum)
+  funktionieren währungsunabhängig. Sentiment-Quellen (StockTwits, ApeWisdom)
+  liefern für .DE-Ticker kaum Daten → Sentiment-Score = neutral 12,5/25.
 """
 import logging
 import time
@@ -150,6 +163,43 @@ RUSSELL200_TICKERS: list[str] = [
     "STRN","STRO","SVRA","SWAV","SYNH","TASK",
 ]
 
+# ── S&P 400 Mid Cap – Top 100 nach Marktkapitalisierung (Stand Q1 2025) ────────
+# Wachstums-Aktien vor dem Sprung in den S&P 500 – oft frühe VCP-Kandidaten
+SP400_TICKERS: list[str] = [
+    "ACI","ACM","ACHC","ACLX","AFG","AGIO","AIT","ALEX","ALGM","ALKS",
+    "AMG","AMKR","ANF","AOS","APA","APAM","ATGE","ATR","AVAV","AVT",
+    "AX","AXTA","BCC","BELFB","BJ","BLD","BRX","BXMT","CABO","CADE",
+    "CBT","CCOI","CDP","CFR","CHE","CHRD","CLF","CLH","CMA","CMC",
+    "CNH","CNM","COHU","COLM","CPF","CRS","CVI","CW","DAN","DINO",
+    "DKS","DLB","DLX","DORM","DXC","EAT","EIG","ENVA","ESE","ESNT",
+    "ETSY","EWBC","EXLS","EXPI","FAF","FBP","FBIN","FCNCA","FHI","FLO",
+    "FNB","FNF","FR","FYBR","GEF","GHC","GL","GMS","GNW","GOOG",
+    "GPK","GPI","GWW","HAE","HALO","HBI","HI","HIW","HLI","HMST",
+    "HRB","HSII","HXL","IAC","IBP","ICUI","IDA","IDCC","IESC","IFS",
+    "IGT","INGR","INSP","IPGP","ITT","JELD","JHG","JNPR","KAI","KFRC",
+    "KNF","KNTK","KRC","LCII","LEA","LNC","LSTR","MARA","MAS","MATX",
+]
+
+# ── DAX 40 – Deutsche Standardwerte (Stand Q1 2025, .DE-Suffix) ───────────────
+# Ergänzend zu US-Märkten laut Original-Spezifikation
+# Hinweis: Sentiment via StockTwits/ApeWisdom minimal → Score-Ebene 3 = neutral
+DAX40_TICKERS: list[str] = [
+    "ADS.DE","AIR.DE","ALV.DE","BAS.DE","BAYN.DE","BMW.DE","BNR.DE",
+    "CON.DE","1COV.DE","DB1.DE","DBK.DE","DHL.DE","DTE.DE","EOAN.DE",
+    "FRE.DE","HEI.DE","HEN3.DE","HNR1.DE","IFX.DE","LIN.DE","MBG.DE",
+    "MRK.DE","MTX.DE","MUV2.DE","P911.DE","PAH3.DE","RHM.DE","RWE.DE",
+    "SAP.DE","SHL.DE","SIE.DE","SRT.DE","SY1.DE","VNA.DE","VOW3.DE",
+    "ZAL.DE","ENR.DE","EVT.DE","FNTN.DE","QIA.DE",
+]
+
+# ── Dow Jones 30 (größtenteils in SP500 enthalten, nur Ergänzungen) ────────────
+DOW30_TICKERS: list[str] = [
+    # Diese Ticker sind in SP500 bereits enthalten; keine Duplikate nötig.
+    # Dow Jones 30: AAPL, AMGN, AXP, BA, CAT, CRM, CSCO, CVX, DIS, DOW,
+    # GS, HD, HON, IBM, INTC, JNJ, JPM, KO, MCD, MMM, MRK, MSFT, NKE,
+    # PG, TRV, UNH, V, VZ, WBA, WMT → alle in SP500_TICKERS enthalten
+]
+
 # ── Persönliche Watchlist (Beispiel-Starter) ──────────────────────────────────
 PERSONAL_TICKERS: list[str] = [
     "ASTS",   # AST SpaceMobile – typischer Pre-Breakout
@@ -173,6 +223,10 @@ def _build_static_map() -> dict[str, str]:
         result.setdefault(t, "NASDAQ100")
     for t in RUSSELL200_TICKERS:
         result.setdefault(t, "RUSSELL200")
+    for t in SP400_TICKERS:
+        result.setdefault(t, "SP400")
+    for t in DAX40_TICKERS:
+        result.setdefault(t, "DAX40")
     for t in PERSONAL_TICKERS:
         result.setdefault(t, "WATCHLIST")
     return result
@@ -203,23 +257,29 @@ def load_from_wikipedia(db: Session) -> int:
     Wird wöchentlich vom Scheduler aufgerufen.
     """
     added = 0
+    # (col, table_index_hint) – Spaltennamen je nach Wikipedia-Seite
     sources = {
-        "SP500":     "https://en.wikipedia.org/wiki/List_of_S%26P_500_companies",
-        "NASDAQ100": "https://en.wikipedia.org/wiki/Nasdaq-100",
+        "SP500":     ("https://en.wikipedia.org/wiki/List_of_S%26P_500_companies", "Symbol"),
+        "NASDAQ100": ("https://en.wikipedia.org/wiki/Nasdaq-100",                   "Ticker"),
+        "SP400":     ("https://en.wikipedia.org/wiki/List_of_S%26P_400_companies",  "Ticker"),
     }
     headers = {"User-Agent": "Mozilla/5.0 (compatible; AIDepot/1.0)"}
 
-    for source, url in sources.items():
+    for source, (url, col) in sources.items():
         try:
             import pandas as pd
             tables = pd.read_html(url, storage_options={"User-Agent": headers["User-Agent"]})
-            col = "Symbol" if source == "SP500" else "Ticker"
             # Richtige Tabelle finden
             for table in tables:
                 if col in table.columns:
-                    tickers = [t.replace(".", "-") for t in table[col].dropna().tolist()]
+                    raw = table[col].dropna().tolist()
+                    # US-Ticker: "." → "-" (BRK.B → BRK-B); .DE-Ticker unverändert
+                    tickers = [
+                        t.replace(".", "-") if not t.endswith(".DE") else t
+                        for t in raw if isinstance(t, str)
+                    ]
                     for ticker in tickers:
-                        if isinstance(ticker, str) and 1 <= len(ticker) <= 10:
+                        if 1 <= len(ticker) <= 12:
                             existing = db.get(Stock, ticker)
                             if not existing:
                                 db.add(Stock(ticker=ticker, universe_source=source, is_active=1))

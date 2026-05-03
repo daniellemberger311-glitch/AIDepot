@@ -8,11 +8,11 @@ Branch: `claude/stock-options-analyzer-umA6s`
 ## Übersicht
 
 ```
-Phase 1 │ Backend-Fundament     │ 100% ✅        │ Abgeschlossen
-Phase 2 │ Scoring-Engine        │ 0%            │ Aktiv – als nächstes
-Phase 3 │ API + Automatisierung │ 0%            │ Folgt auf Phase 2
-Phase 4 │ Backtesting-Modul     │ 0%            │ Nach Phase 3
-Phase 5 │ Frontend              │ 0%            │ Parallel zu Phase 3/4
+Phase 1 │ Backend-Fundament       │ 100% ✅  │ Abgeschlossen
+Phase 2 │ Scoring-Engine          │   0%     │ Aktiv – als nächstes
+Phase 3 │ API + Scheduler + Konfig│   0%     │ Folgt auf Phase 2
+Phase 4 │ Backtesting-Modul       │   0%     │ Nach Phase 3
+Phase 5 │ Frontend (7 Seiten)     │   0%     │ Parallel zu Phase 3/4
 ```
 
 **Meilenstein „Erster lauffähiger Scan":** Ende Phase 3  
@@ -22,43 +22,15 @@ Phase 5 │ Frontend              │ 0%            │ Parallel zu Phase 3/4
 
 ## Phase 1 – Backend-Fundament ✅ ABGESCHLOSSEN
 
-**Ziel:** Alle Datenquellen angebunden, Datenbank läuft, Backend startet fehlerfrei.
-
-### ✅ Bereits erledigt
-
-| Datei | Beschreibung |
-|-------|-------------|
-| `backend/config.py` | Pydantic BaseSettings, liest `.env` |
-| `backend/database.py` | SQLite-Engine, Session-Factory, `init_db()` |
-| `backend/models.py` | 13 SQLAlchemy ORM-Modelle |
-| `backend/schemas.py` | Alle Pydantic Request/Response-Typen |
-| `backend/main.py` | FastAPI-App, CORS, Lifespan |
-| `backend/cache/store.py` | TTL-Cache (In-Memory + SQLite) |
-| `backend/fetchers/base.py` | BaseFetcher: Cache-Lookup, Retry-Dekorator |
-| `backend/fetchers/yfinance_fetcher.py` | OHLCV, Fundamentals, Earnings, Insider |
-| `backend/fetchers/stocktwits_fetcher.py` | Bullish-Ratio, Trending Tickers |
-| `backend/fetchers/apewisdom_fetcher.py` | Reddit-Mentions |
-| `backend/fetchers/finnhub_fetcher.py` | News-Sentiment, Insider, Earnings, Analyst-Ratings |
-| `scripts/init_db.py` | DB-Initialisierung mit Startkonfiguration |
-
-### ⏳ Noch offen
-
-| Schritt | Datei | Aufwand | Priorität |
-|---------|-------|---------|-----------|
-| 1.1 | `backend/fetchers/alphavantage_fetcher.py` | Klein | Mittel – 25/Tag-Limit beachten |
-| 1.2 | `backend/fetchers/marketaux_fetcher.py` | Klein | Mittel |
-| 1.3 | `backend/fetchers/simfin_fetcher.py` | Klein | Mittel |
-| 1.4 | `backend/universe/loader.py` | Mittel | Hoch – wird von Scheduler benötigt |
-| 1.5 | `scripts/test_fetchers.py` | Klein | Smoke-Test vor Phase 2 |
-
-**Abschluss-Kriterium:** `python scripts/test_fetchers.py AAPL` zeigt Daten aus allen Quellen ohne Fehler.
+Alle Fetcher, Datenbank, Cache, Universum-Loader fertig.  
+Universum: 703 aktive Ticker + 6.243 Reserve (NYSE/NASDAQ). Detailstatus → `TODO.md`.
 
 ---
 
 ## Phase 2 – Scoring-Engine
 
 **Ziel:** Jeder Ticker erhält täglich einen validen Score 0–100 mit vollständiger Aufschlüsselung.  
-**Abhängigkeit:** Phase 1 vollständig abgeschlossen.
+**Abhängigkeit:** Phase 1 abgeschlossen ✅
 
 ### Schritte (in dieser Reihenfolge)
 
@@ -94,15 +66,8 @@ Phase 5 │ Frontend              │ 0%            │ Parallel zu Phase 3/4
 | Preis-Nähe zu Widerstand | 0–5 | <3% → 5; 3–7% → 3; >10% → 0 |
 | RSI 55–70 | 0–5 | 55–70 → 5; 50–55 od. 70–75 → 3; sonst 0 |
 | Relative Stärke vs. SPY | 0–4 | RS > 1,1 (20T) → 4; 1,0–1,1 → 2; <1,0 → 0 |
-| MACD-Signal | 0–3 | Histogramm positiv + steigend → 3; flach → 1 |
+| MACD-Signal | 0–3 | Histogramm positiv + steigend → 3; flach → 1 (ta-Bibliothek) |
 | Bollinger-Squeeze | 0–3 | BB-Breite < 20. Perzentil (52W) → 3 |
-
-**VCP-Erkennung (Kern des technischen Scores):**
-- Swing-Hochs der letzten 20 Wochen identifizieren
-- Jede Korrektur kleiner als vorherige (Verhältnis < 0,85)
-- Volumen in Down-Wochen sinkt progressiv
-- Kurs innerhalb 10% des 52-Wochen-Hochs
-- Implementierung: `ta`-Bibliothek + manuelle Pivot-Berechnung auf yfinance-OHLCV
 
 **Ebene 3 – Sentiment (max. 25 Punkte)**
 
@@ -113,19 +78,18 @@ Phase 5 │ Frontend              │ 0%            │ Parallel zu Phase 3/4
 | Reddit-Momentum | 0–5 | +50% vs. 7T-Ø → 5; +20–50% → 3; flach → 1 |
 | Analysten-Delta | 0–5 | ≥2 Netto-Upgrades → 5; 1 → 3; neutral → 1; Downgrade → 0 |
 
-**Unterdrückungsregel:**  
-Wenn L1 + L2 > 50 UND L3 < 5 → Score auf max. 74 gedeckelt (kein Zone-1-Eintrag).
+**Unterdrückungsregel:** Wenn L1+L2 > 50 UND L3 < 5 → Score max. 74 (kein Zone-1-Eintrag).
 
 **Abschluss-Kriterium:** `orchestrator.score_ticker("AAPL")` schreibt valide Zeile in `daily_scores` + `score_history` + `score_breakdown`.
 
 ---
 
-## Phase 3 – API-Endpunkte & Automatisierung
+## Phase 3 – API-Endpunkte, Scheduler & Konfigurationsmodul
 
 **Ziel:** Backend vollständig nutzbar, täglicher Scan läuft automatisch, Telegram-Nachrichten kommen an.  
 **Abhängigkeit:** Phase 2 abgeschlossen.
 
-### API-Endpunkte
+### 3.1 – API-Endpunkte
 
 | Schritt | Datei | Endpunkte |
 |---------|-------|----------|
@@ -136,16 +100,111 @@ Wenn L1 + L2 > 50 UND L3 < 5 → Score auf max. 74 gedeckelt (kein Zone-1-Eintra
 | 3.5 | `backend/api/dashboard.py` | `GET /api/dashboard` |
 | 3.6 | `backend/api/history.py` | Trades, Signalqualität |
 | 3.7 | `backend/api/scan.py` | Manueller Scan-Trigger |
-| 3.8 | `backend/api/config.py` | Konfiguration lesen/schreiben |
-| 3.9 | `backend/api/universe.py` | Universum verwalten |
+| 3.8 | `backend/api/backtest.py` | `POST /api/backtest` |
 
-### Automatisierung
+### 3.2 – Konfigurationsmodul (`backend/api/config.py` + `backend/api/universe.py`)
+
+Das Konfigurationsmodul ist der zentrale Steuerungsbereich der App.
+
+**`GET/PUT /api/config`** – App-Einstellungen:
+
+| Bereich | Parameter | Standard |
+|---------|-----------|---------|
+| Scoring-Gewichtungen | `weight_fundamental`, `weight_technical`, `weight_sentiment` | 40 / 35 / 25 |
+| Zonen-Grenzen | `zone1_min`, `zone2_min`, `zone3_min` | 76 / 61 / 41 |
+| Alert-Schwellen | `alert_delta_1d`, `alert_streak_days` | 15 / 3 |
+| Exit-Schwellen | `exit_score_drop`, `exit_ko_pct`, `exit_weeks_expiry`, `exit_bull_ratio` | 15 / 8 / 3 / 35 |
+| Scan-Zeitplan | `scan_hour_utc`, `scan_minute_utc` | 6 / 0 |
+| Rotation | `zone4_batch_size` (Aktien/Tag Zone 4) | 200 |
+| Telegram | `telegram_bot_token`, `telegram_chat_id` | – |
+
+**`GET /api/config/status`** – API-Key-Status (grün/rot pro Dienst):
+```json
+{
+  "yfinance":       {"status": "ok",      "note": "kein Key erforderlich"},
+  "stocktwits":     {"status": "ok",      "note": "kein Key erforderlich"},
+  "apewisdom":      {"status": "ok",      "note": "kein Key erforderlich"},
+  "finnhub":        {"status": "missing", "note": "FINNHUB_API_KEY nicht gesetzt"},
+  "alpha_vantage":  {"status": "ok",      "remaining_today": 24},
+  "marketaux":      {"status": "missing", "note": "MARKETAUX_API_KEY nicht gesetzt"},
+  "simfin":         {"status": "missing", "note": "SIMFIN_API_KEY nicht gesetzt"},
+  "telegram":       {"status": "missing", "note": "TELEGRAM_BOT_TOKEN nicht gesetzt"}
+}
+```
+
+**`POST /api/universe/refresh`** – Universe aktualisieren:
+- Ruft `load_from_wikipedia()` auf → holt aktuelle S&P 500 + NASDAQ 100 von Wikipedia
+- Ruft `load_from_av_listing()` auf → aktualisiert NYSE/NASDAQ-Reserve (1 AV-Credit)
+- Gibt zurück: `{added: int, updated: int, total_active: int}`
+
+**`GET /api/universe`** – alle Ticker (aktiv + inaktiv, filterbar nach Quelle)
+
+**`POST /api/universe/add`** – Ticker manuell hinzufügen:
+```json
+{"ticker": "ASTS", "name": "AST SpaceMobile"}
+```
+- Legt Ticker mit `universe_source = "WATCHLIST"` und `is_active = 1` an
+- Wird automatisch in den regulären Scan-Zyklus aufgenommen
+- Erscheint in allen Scan-Tiers wie ein normaler Ticker
+
+**`DELETE /api/universe/{ticker}`** – Ticker deaktivieren (`is_active = 0`):
+- Entfernt Ticker aus dem Scan-Zyklus
+- Historische Scores bleiben erhalten
+
+**`GET /api/universe/search?q=Tesla`** – Suche in der Reserve-Datenbank (is_active=0):
+- Zeigt Treffer aus den 6.243 Reserve-Tickern
+- Nutzer kann gefundene Ticker mit einem Klick aktivieren
+
+### 3.3 – Universum-Erweiterung in `loader.py`
+
+Zusätzliche Indizes die beim nächsten Loader-Update aufgenommen werden:
+
+| Index | Ticker-Anzahl | Suffix | Bemerkung |
+|-------|--------------|--------|-----------|
+| S&P 400 Mid Cap | ~100 relevante | keine | Wachstums-Aktien vor S&P-500-Aufnahme |
+| DAX 40 | 40 | `.DE` | Original-Spec: „ergänzend DAX"; yfinance unterstützt `.DE` |
+| Dow Jones 30 | 30 | keine | Größtenteils in S&P 500 enthalten, Überschneidung prüfen |
+
+**DAX-Hinweis:** Deutsche Aktien benötigen `.DE`-Suffix bei yfinance (z. B. `SAP.DE`, `SIE.DE`). Der Scorer muss EUR-Kurse akzeptieren; alle relativen Berechnungen (RSI, Momentum, VCP) funktionieren währungsunabhängig. Sentiment-Quellen (StockTwits, ApeWisdom) liefern für DAX-Werte kaum Daten → Sentiment-Score = neutral 12,5/25 für .DE-Ticker.
+
+### 3.4 – Scan-Rotation & Mindestfrequenz
+
+**Ziel: Jede aktive Aktie wird mindestens 1x pro Woche vollständig gescannt.**
+
+```
+Tier 0  Gehaltene Positionen (~5–20)   → täglich, alle APIs
+Tier 1  Zone 1+2 (~150)               → täglich, alle APIs (AV nur Top 10)
+Tier 2  Zone 3 (~200)                  → täglich, yfinance + StockTwits + ApeWisdom
+Tier 3  Zone 4 + restliche Aktien      → rotierend, nur yfinance + ta
+```
+
+**Rotation Zone 4 (konfigurierbar, Standard: 200 Aktien/Tag):**
+
+| Aktive Ticker Zone 4 | Batch/Tag | Wiederholungsintervall |
+|----------------------|-----------|------------------------|
+| ~400 (aktuell) | 200 | 2 Tage |
+| ~600 (nach Erweiterung) | 200 | 3 Tage |
+| ~1.000 (maximale Ausbaustufe) | 200 | 5 Tage |
+| ~1.400 (absolute Grenze) | 200 | 7 Tage = wöchentlich |
+
+**→ Mit `zone4_batch_size = 200` ist die wöchentliche Mindestfrequenz für bis zu ~1.400 Zone-4-Aktien garantiert.**
+
+Bei Bedarf `zone4_batch_size` via Konfigurationsseite erhöhen (z. B. 300/Tag für kürzeres Intervall).
+
+**Rotation-Index:** Wird täglich in der `configuration`-Tabelle als `scan_rotation_idx` gespeichert. Bei Neustart setzt der Scan nahtlos an der letzten Position fort.
+
+**Wöchentliche Aufgaben (Scheduler, sonntags 02:00 UTC):**
+- Wikipedia-Listen aktualisieren (neue Index-Zusammensetzung)
+- AV LISTING_STATUS auffrischen (1 Credit)
+- Abgelaufene API-Cache-Einträge löschen
+
+### 3.5 – Automatisierung
 
 | Schritt | Datei | Beschreibung |
 |---------|-------|-------------|
-| 3.10 | `backend/scheduler/priority_queue.py` | Priorisierte Scan-Reihenfolge (Tier 0–4) |
-| 3.11 | `backend/scheduler/jobs.py` | APScheduler: 06:00 UTC Scan + Portfolio-Monitor |
-| 3.12 | `backend/notifications/telegram.py` | Bot-Sender + alle Nachrichten-Templates |
+| 3.9 | `backend/scheduler/priority_queue.py` | Tier-Reihenfolge + Rotations-Index |
+| 3.10 | `backend/scheduler/jobs.py` | Tägl. 06:00 UTC + wöchentl. Sonntag 02:00 UTC |
+| 3.11 | `backend/notifications/telegram.py` | Bot-Sender + Templates |
 
 ### Notification-Templates
 
@@ -159,33 +218,27 @@ Wenn L1 + L2 > 50 UND L3 < 5 → Score auf max. 74 gedeckelt (kein Zone-1-Eintra
 
 **Abschluss-Kriterium:**
 1. `curl -X POST localhost:8000/api/scan/trigger` startet Scan
-2. Watchlist unter `GET /api/watchlist` zeigt Ergebnisse
-3. Telegram-Nachricht kommt nach Scan an
+2. `GET /api/watchlist` gibt Ergebnisse zurück
+3. `GET /api/config/status` zeigt API-Key-Statusübersicht
+4. Telegram-Nachricht kommt nach Scan an
 
 ---
 
 ## Phase 4 – Backtesting-Modul
 
-**Ziel:** Nutzer gibt Ticker + Zeitraum ein, sieht wann welche Signale aufgetreten wären.  
+**Ziel:** Ticker + Zeitraum eingeben → sehen, wann welche Signale aufgetreten wären.  
 **Abhängigkeit:** Phase 2 (Scoring-Engine) abgeschlossen.
-
-### Schritte
 
 | Schritt | Datei | Beschreibung |
 |---------|-------|-------------|
-| 4.1 | `backend/backtesting/historical_data.py` | OHLCV + Fundamentals für Vergangenheit laden |
+| 4.1 | `backend/backtesting/historical_data.py` | OHLCV + Fundamentals für Vergangenheit |
 | 4.2 | `backend/backtesting/engine.py` | Score für jeden historischen Tag berechnen |
 | 4.3 | `backend/backtesting/signal_mapper.py` | Signal-Events auf Zeitstrahl projizieren |
 | 4.4 | `backend/api/backtest.py` | `POST /api/backtest` Endpunkt |
 
-### Einschränkungen
+**Einschränkungen:** Historisches Sentiment nicht verfügbar → neutral 12,5/25. Kein P&L-Simulator (nur Signal-Zeitstrahl).
 
-- **Sentiment historisch nicht verfügbar** → neutraler Wert 12,5/25 für alle Vergangenheitsdaten
-- **Kein Transaktions-Simulator** → nur Signal-Zeitstrahl, keine automatische P&L
-- **Alpha-Vantage-Limit** nicht betroffen (nur yfinance + `ta`)
-
-### Darstellung im Frontend (Phase 5)
-
+**Darstellung:**
 ```
 [Ticker]  [Von]  [Bis]  [Berechnen]
 
@@ -196,19 +249,16 @@ Score-Verlauf 0–100 (Zonen als farbige Hintergrundbänder)
 Signal-Zeitstrahl mit Icons pro Event-Typ
 ```
 
-**Abschluss-Kriterium:** `POST /api/backtest { "ticker": "NVDA", "from_date": "2024-01-01", "to_date": "2025-05-01" }` gibt valide Score-Zeitreihe + Signal-Events zurück.
-
 ---
 
-## Phase 5 – Frontend
+## Phase 5 – Frontend (7 Seiten)
 
-**Ziel:** Vollständige React-App mit allen 6 Seiten.  
+**Ziel:** Vollständige React-App mit allen Seiten.  
 **Abhängigkeit:** Phase 3 API-Endpunkte abgeschlossen (kann parallel entwickelt werden).
 
-### Schritt 5.1 – Scaffolding & Konfiguration
+### Setup
 
 ```bash
-cd AIDepot
 npm create vite@latest frontend -- --template react-ts
 cd frontend
 npm install @tanstack/react-query react-router-dom recharts axios \
@@ -216,23 +266,7 @@ npm install @tanstack/react-query react-router-dom recharts axios \
             react-hook-form zod lucide-react
 ```
 
-**Konfiguration:**
-- `vite.config.ts`: Proxy `/api/**` → `localhost:8000`
-- Tailwind initialisieren
-- React Router v6 einrichten
-
-### Schritt 5.2 – Gemeinsame Komponenten
-
-| Komponente | Beschreibung |
-|-----------|-------------|
-| `ScoreBadge` | Farbige Pille 0–100 (rot/gelb/grün nach Zone) |
-| `DeltaBadge` | ±Delta mit ▲/▼-Pfeil und Farbe |
-| `ZoneBadge` | Z1/Z2/Z3/Z4-Tag |
-| `MiniChart` | Recharts-Sparkline für Score-Verlauf |
-| `DataTable` | Sortierbare Tabelle (wiederverwendbar) |
-| `Layout` + `Sidebar` + `TopBar` | App-Shell |
-
-### Schritt 5.3 – Seiten
+### Seiten
 
 | Seite | Route | Hauptinhalt |
 |-------|-------|-------------|
@@ -241,57 +275,74 @@ npm install @tanstack/react-query react-router-dom recharts axios \
 | Signal-Detail | `/signal/:ticker` | Score-Aufschlüsselung, 30T-Chart, OS-Empfehlung |
 | Portfolio | `/portfolio` | Positionen, Status HALTEN/BEOBACHTEN/EXIT, Kauf/Verkauf |
 | Trade-Historie | `/history` | Archiv, P&L-Statistik, Trefferquote pro Signaltyp |
-| Backtesting | `/backtest` | Ticker+Zeitraum eingeben, Signal-Zeitstrahl anzeigen |
+| Backtesting | `/backtest` | Ticker+Zeitraum, Signal-Zeitstrahl |
+| **Konfiguration** | `/config` | Alle Einstellungen (siehe unten) |
 
-### Schritt 5.4 – State-Management
+### Konfigurationsseite (7. Seite) – Tab-Struktur
 
-**TanStack Query v5** für Server-State (Polling alle 60 Sek. für Portfolio/Dashboard).  
-**useState/useReducer** nur für UI-State (Filter, Modal offen/geschlossen).  
-Kein Redux – Single-User-App, minimal state needed.
+**Tab 1 – Universum:**
+- Suchfeld: Ticker eingeben oder aus Reserve suchen → „Hinzufügen"-Button
+- Aktive Ticker-Liste mit Quelle + Datum hinzugefügt + Entfernen-Button
+- **„Universum aktualisieren"-Button** → ruft `POST /api/universe/refresh` auf
+  - Holt aktuelle S&P 500 + NASDAQ 100 von Wikipedia
+  - Aktualisiert NYSE/NASDAQ-Reserve via AV LISTING_STATUS
+  - Zeigt Fortschritt + Ergebnis (n neue Ticker hinzugefügt)
+- Letztes Update-Datum der Index-Listen
 
-**Abschluss-Kriterium:** Alle 6 Seiten laden echte Daten, Portfolio-CRUD funktioniert, Backtesting-Chart wird gerendert.
+**Tab 2 – API-Status:**
+- Übersicht aller 8 Dienste: grüner Haken oder rotes Kreuz
+- Bei fehlendem Key: direkter Hinweis auf `.env`-Variable
+- Alpha Vantage: Tagesquota-Anzeige (z. B. „22 von 25 verbleibend")
+
+**Tab 3 – Scoring-Gewichtungen:**
+- Schieberegler: Fundamental / Technisch / Sentiment (Summe muss 100 ergeben)
+- Tabellarische Übersicht der Punkteverteilung
+- Zonen-Grenzen anpassen (76 / 61 / 41)
+
+**Tab 4 – Scan-Konfiguration:**
+- Scan-Uhrzeit (Standard: 06:00 UTC)
+- Zone-4-Batch-Größe (Standard: 200 Aktien/Tag)
+- Nächster Scan-Zeitpunkt + letzter Scan-Zeitpunkt
+- Anzeige: „Zone 4 wird alle X Tage vollständig gescannt"
+
+**Tab 5 – Alert-Schwellen:**
+- Exit-Schwellen (Score-Drop, KO-Abstand, Restlaufzeit, Bullish-Ratio)
+- Notification-Schwellen (Δ1T-Spike, 7T-Streak-Tage)
+- Telegram-Token + Chat-ID (mit Test-Nachricht-Button)
 
 ---
 
 ## Abhängigkeitsgraph
 
 ```
-Phase 1 (Fetcher + DB)
+Phase 1 (Fetcher + DB + Universe) ✅
     │
     ▼
 Phase 2 (Scoring-Engine)  ─────────────────────┐
     │                                           │
     ▼                                           │
-Phase 3 (API + Scheduler)    Phase 4 (Backtest)─┤
+Phase 3 (API + Scheduler + Config)  Phase 4 (Backtest)
     │                                           │
     └──────────────────────────────────────────▼
-                                         Phase 5 (Frontend)
+                                         Phase 5 (Frontend, 7 Seiten)
 ```
 
-Phase 4 und Phase 5 können **parallel** zu Phase 3 entwickelt werden, sobald Phase 2 abgeschlossen ist.
+Phase 4 und Phase 5 können **parallel** zu Phase 3 entwickelt werden.
 
 ---
 
-## Zeitschätzung (grob)
+## Zeitschätzung
 
-| Phase | Aufwand | Kumulativ |
-|-------|---------|-----------|
-| Phase 1 Rest (3 Fetcher + Universe) | ~2h | ~2h |
-| Phase 2 (Scoring-Engine) | ~4h | ~6h |
-| Phase 3 (API + Scheduler + Telegram) | ~4h | ~10h |
-| Phase 4 (Backtesting) | ~2h | ~12h |
-| Phase 5 (Frontend) | ~6h | ~18h |
+| Phase | Aufwand |
+|-------|---------|
+| Phase 2 (Scoring-Engine) | ~4h |
+| Phase 3 (API + Scheduler + Config-Modul) | ~5h |
+| Phase 4 (Backtesting) | ~2h |
+| Phase 5 (Frontend, 7 Seiten) | ~7h |
+| **Gesamt ab jetzt** | **~18h** |
 
 ---
 
-## Nächster konkreter Schritt
+## Nächster Schritt
 
-**→ Phase 1 abschließen:**
-
-1. `backend/fetchers/alphavantage_fetcher.py` – kleiner Fetcher, 25/Tag-Limit beachten
-2. `backend/fetchers/marketaux_fetcher.py` – News + Sentiment
-3. `backend/fetchers/simfin_fetcher.py` – Fundamentaldaten
-4. `backend/universe/loader.py` – S&P 500, NASDAQ 100, Russell 2000 als Liste laden
-5. `scripts/test_fetchers.py` – Smoke-Test aller 8 Quellen
-
-Dann direkt in Phase 2 (Scoring-Engine) starten.
+**→ Phase 2 starten:** `backend/scoring/fundamental.py` → `technical.py` → `sentiment.py` → `delta.py` → `options.py` → `orchestrator.py`
