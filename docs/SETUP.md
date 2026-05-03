@@ -58,9 +58,22 @@ npm run dev
 **App öffnen:** http://localhost:5173  
 **API-Docs:** http://localhost:8000/docs
 
-## API-Keys beschaffen (alle kostenlos)
+## API-Keys Status
 
-### Finnhub (empfohlen, 60 Calls/Min)
+| Dienst | Variable | Limit | Status |
+|--------|----------|-------|--------|
+| Alpha Vantage | `ALPHA_VANTAGE_API_KEY` | 25 Calls/Tag, 5/Min | ✅ konfiguriert |
+| Finnhub | `FINNHUB_API_KEY` | 60 Calls/Min | ✅ konfiguriert |
+| Marketaux | `MARKETAUX_API_KEY` | 100 News/Tag | ✅ konfiguriert |
+| SimFin | `SIMFIN_API_KEY` | unbegrenzt (privat) | ✅ konfiguriert |
+| Telegram Bot | `TELEGRAM_BOT_TOKEN` | kostenlos | ⏳ noch nicht eingerichtet |
+| Telegram Chat-ID | `TELEGRAM_CHAT_ID` | – | ⏳ noch nicht eingerichtet |
+
+Alle Keys sind in `.env` hinterlegt (`.gitignore`d – niemals einchecken).
+
+## API-Keys beschaffen
+
+### Finnhub (60 Calls/Min)
 1. https://finnhub.io → "Get free API key"
 2. Key in `.env`: `FINNHUB_API_KEY=...`
 

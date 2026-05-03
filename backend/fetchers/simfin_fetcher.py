@@ -42,29 +42,36 @@ class SimFinFetcher(BaseFetcher):
         if not settings.simfin_api_key:
             return default
         try:
-            # Gewinn- und Verlustrechnung (TTM)
+            params_base = {"ticker": ticker, "period": "TTM", "fyear": "latest"}
+
+            # Gewinn- und Verlustrechnung
             r_income = requests.get(
                 f"{self.BASE_URL}/companies/statements/compact",
-                params={"ticker": ticker, "statements": "PL", "period": "TTM", "fyear": "latest"},
-                headers=self._headers(),
-                timeout=15,
+                params={**params_base, "statements": "PL"},
+                headers=self._headers(), timeout=15,
             )
             r_income.raise_for_status()
-            income = r_income.json()
 
             # Cashflow-Statement
             r_cf = requests.get(
                 f"{self.BASE_URL}/companies/statements/compact",
-                params={"ticker": ticker, "statements": "CF", "period": "TTM", "fyear": "latest"},
-                headers=self._headers(),
-                timeout=15,
+                params={**params_base, "statements": "CF"},
+                headers=self._headers(), timeout=15,
             )
             r_cf.raise_for_status()
-            cashflow = r_cf.json()
+
+            # Bilanz (für D/E-Ratio und Verschuldungsgrad)
+            r_bs = requests.get(
+                f"{self.BASE_URL}/companies/statements/compact",
+                params={**params_base, "statements": "BS"},
+                headers=self._headers(), timeout=15,
+            )
+            r_bs.raise_for_status()
 
             result = dict(default)
-            result.update(self._parse_income(income))
-            result.update(self._parse_cashflow(cashflow))
+            result.update(self._parse_income(r_income.json()))
+            result.update(self._parse_cashflow(r_cf.json()))
+            result.update(self._parse_balance_sheet(r_bs.json()))
             return result
 
         except Exception as exc:
@@ -111,4 +118,24 @@ class SimFinFetcher(BaseFetcher):
                 result["fcf_prev_year"] = float(prev_fcf) if prev_fcf else None
         except Exception as exc:
             logger.debug("SimFin CF-Parse: %s", exc)
+        return result
+
+    def _parse_balance_sheet(self, data: dict) -> dict:
+        """D/E-Ratio aus SimFin-Balance-Sheet extrahieren."""
+        result = {}
+        try:
+            rows = data[0].get("statements", [{}])[0].get("data", [])
+            cols = data[0].get("statements", [{}])[0].get("columns", [])
+            if not rows or not cols:
+                return result
+            row = dict(zip(cols, rows[-1]))
+            # Gesamtschulden: Long-Term Debt + Short-Term Debt
+            lt_debt = row.get("Long Term Debt") or row.get("Long-Term Debt") or 0
+            st_debt = row.get("Short Term Debt") or row.get("Short-Term Debt") or 0
+            equity  = row.get("Total Equity") or row.get("Shareholders' Equity")
+            total_debt = float(lt_debt or 0) + float(st_debt or 0)
+            if equity and float(equity) > 0:
+                result["debt_to_equity"] = round(total_debt / float(equity), 4)
+        except Exception as exc:
+            logger.debug("SimFin BS-Parse: %s", exc)
         return result

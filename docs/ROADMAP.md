@@ -1,6 +1,6 @@
 # AIDepot – Entwicklungs-Roadmap
 
-Zuletzt aktualisiert: 2025-05-03  
+Zuletzt aktualisiert: 2026-05-03  
 Branch: `claude/stock-options-analyzer-umA6s`
 
 ---
@@ -9,8 +9,8 @@ Branch: `claude/stock-options-analyzer-umA6s`
 
 ```
 Phase 1 │ Backend-Fundament       │ 100% ✅  │ Abgeschlossen
-Phase 2 │ Scoring-Engine          │   0%     │ Aktiv – als nächstes
-Phase 3 │ API + Scheduler + Konfig│   0%     │ Folgt auf Phase 2
+Phase 2 │ Scoring-Engine          │ 100% ✅  │ Abgeschlossen
+Phase 3 │ API + Scheduler + Konfig│  15%     │ Aktiv – als nächstes
 Phase 4 │ Backtesting-Modul       │   0%     │ Nach Phase 3
 Phase 5 │ Frontend (7 Seiten)     │   0%     │ Parallel zu Phase 3/4
 ```
@@ -27,10 +27,10 @@ Universum: 703 aktive Ticker + 6.243 Reserve (NYSE/NASDAQ). Detailstatus → `TO
 
 ---
 
-## Phase 2 – Scoring-Engine
+## Phase 2 – Scoring-Engine ✅ ABGESCHLOSSEN
 
-**Ziel:** Jeder Ticker erhält täglich einen validen Score 0–100 mit vollständiger Aufschlüsselung.  
-**Abhängigkeit:** Phase 1 abgeschlossen ✅
+**Ergebnis:** Jeder Ticker erhält täglich einen validen Score 0–100 mit vollständiger Aufschlüsselung.  
+Abschluss-Test: `score_ticker("AAPL")` → Score 39/100, Zone 4, alle 4 DB-Tabellen befüllt.
 
 ### Schritte (in dieser Reihenfolge)
 
@@ -87,20 +87,21 @@ Universum: 703 aktive Ticker + 6.243 Reserve (NYSE/NASDAQ). Detailstatus → `TO
 ## Phase 3 – API-Endpunkte, Scheduler & Konfigurationsmodul
 
 **Ziel:** Backend vollständig nutzbar, täglicher Scan läuft automatisch, Telegram-Nachrichten kommen an.  
-**Abhängigkeit:** Phase 2 abgeschlossen.
+**Abhängigkeit:** Phase 2 abgeschlossen ✅
 
 ### 3.1 – API-Endpunkte
 
-| Schritt | Datei | Endpunkte |
-|---------|-------|----------|
-| 3.1 | `backend/api/router.py` | Alle Router zusammenführen |
-| 3.2 | `backend/api/watchlist.py` | `GET /api/watchlist` |
-| 3.3 | `backend/api/signals.py` | `GET /api/signals/{ticker}` |
-| 3.4 | `backend/api/portfolio.py` | CRUD Positionen, Exit-Signale |
-| 3.5 | `backend/api/dashboard.py` | `GET /api/dashboard` |
-| 3.6 | `backend/api/history.py` | Trades, Signalqualität |
-| 3.7 | `backend/api/scan.py` | Manueller Scan-Trigger |
-| 3.8 | `backend/api/backtest.py` | `POST /api/backtest` |
+| Schritt | Datei | Endpunkte | Status |
+|---------|-------|----------|----|
+| 3.0 | `backend/api/router.py` + `backend/api/logs.py` | Basis-Router + GET /api/logs | ✅ fertig |
+| 3.2 | `backend/api/watchlist.py` | `GET /api/watchlist` | ⏳ offen |
+| 3.3 | `backend/api/signals.py` | `GET /api/signals/{ticker}` | ⏳ offen |
+| 3.4 | `backend/api/portfolio.py` | CRUD Positionen, Exit-Signale | ⏳ offen |
+| 3.5 | `backend/api/dashboard.py` | `GET /api/dashboard` | ⏳ offen |
+| 3.6 | `backend/api/history.py` | Trades, Signalqualität | ⏳ offen |
+| 3.7 | `backend/api/scan.py` | Manueller Scan-Trigger | ⏳ offen |
+| 3.8 | `backend/api/config.py` | GET/PUT /api/config + /api/config/status | ⏳ offen |
+| 3.9 | `backend/api/universe.py` | Universe CRUD + Suche | ⏳ offen |
 
 ### 3.2 – Konfigurationsmodul (`backend/api/config.py` + `backend/api/universe.py`)
 

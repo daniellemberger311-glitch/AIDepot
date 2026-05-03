@@ -20,6 +20,15 @@ ANALYST_TTL   = 24 * 3600
 _calls_this_minute: list[float] = []
 
 
+def _to_finnhub_symbol(ticker: str) -> str:
+    """Konvertiert yfinance-Ticker ins Finnhub-Format.
+    Deutsche Aktien: SAP.DE → SAP (Finnhub erwartet Basis-Ticker für XETRA).
+    """
+    if ticker.endswith(".DE"):
+        return ticker[:-3]
+    return ticker
+
+
 def _rate_limit():
     """Sicherstellt max. 55 Calls/Min (5 Calls Puffer)."""
     global _calls_this_minute
@@ -45,6 +54,11 @@ class FinnhubFetcher(BaseFetcher):
         resp.raise_for_status()
         return resp.json()
 
+    @staticmethod
+    def _sym(ticker: str) -> str:
+        """Ticker ins Finnhub-Format umwandeln (.DE entfernen)."""
+        return _to_finnhub_symbol(ticker)
+
     def get_news_sentiment(self, ticker: str) -> dict:
         """Aggregierter News-Sentiment-Score. Gecacht 2 Stunden."""
         key = self._make_key("sentiment", ticker)
@@ -62,7 +76,7 @@ class FinnhubFetcher(BaseFetcher):
         if not settings.finnhub_api_key:
             return default
         try:
-            r = self._get("news-sentiment", {"symbol": ticker})
+            r = self._get("news-sentiment", {"symbol": self._sym(ticker)})
             return {
                 "buzz_score":      r.get("buzz", {}).get("buzz", 0.5),
                 "sentiment_score": r.get("sentiment", {}).get("bullishPercent", 0.5) - 0.5,
@@ -91,7 +105,7 @@ class FinnhubFetcher(BaseFetcher):
         try:
             cutoff = (datetime.now() - timedelta(days=90)).strftime("%Y-%m-%d")
             today  = datetime.now().strftime("%Y-%m-%d")
-            r = self._get("stock/insider-transactions", {"symbol": ticker, "from": cutoff, "to": today})
+            r = self._get("stock/insider-transactions", {"symbol": self._sym(ticker), "from": cutoff, "to": today})
             txs = r.get("data", []) if isinstance(r, dict) else []
             buys  = sum(1 for t in txs if t.get("transactionCode") in ("P",))
             sells = sum(1 for t in txs if t.get("transactionCode") in ("S", "S-Auto"))
@@ -116,7 +130,7 @@ class FinnhubFetcher(BaseFetcher):
         if not settings.finnhub_api_key:
             return []
         try:
-            r = self._get("stock/earnings", {"symbol": ticker})
+            r = self._get("stock/earnings", {"symbol": self._sym(ticker)})
             results = []
             for item in (r or [])[:quarters]:
                 actual   = item.get("actual")
@@ -150,7 +164,7 @@ class FinnhubFetcher(BaseFetcher):
         if not settings.finnhub_api_key:
             return default
         try:
-            r = self._get("stock/recommendation", {"symbol": ticker})
+            r = self._get("stock/recommendation", {"symbol": self._sym(ticker)})
             if not r:
                 return default
             current = r[0] if r else {}

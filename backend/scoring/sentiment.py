@@ -111,10 +111,13 @@ def compute_sentiment_score(ticker: str, db: Session) -> tuple[float, dict]:
     st_f = StockTwitsFetcher(db)
     aw_f = ApeWisdomFetcher(db)
 
+    # DAX-/DE-Aktien: StockTwits und ApeWisdom sind US-only → neutral
+    is_german = ticker.endswith(".DE")
+
     fh_sent = fh_f.get_news_sentiment(ticker)
     mx_sent = mx_f.get_news_sentiment(ticker)
-    st_sent = st_f.get_sentiment_ratio(ticker)
-    aw_ment = aw_f.get_mentions(ticker)
+    st_sent = st_f.get_sentiment_ratio(ticker) if not is_german else {"bullish_ratio": None, "total": 0}
+    aw_ment = aw_f.get_mentions(ticker)        if not is_german else {"mentions": 0, "mentions_24h_ago": 0}
     analyst = fh_f.get_analyst_recommendations(ticker)
 
     # Nur Scores mit echten Artikeln einfließen lassen (0 bei fehlendem Key ausschließen)

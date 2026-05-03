@@ -5,6 +5,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from backend.config import settings
 from backend.database import init_db
 from backend.api.router import router
+from backend.log_handler import setup_logging
+
+# Logging so früh wie möglich initialisieren
+setup_logging()
 
 
 @asynccontextmanager

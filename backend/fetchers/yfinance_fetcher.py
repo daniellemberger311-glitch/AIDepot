@@ -112,20 +112,24 @@ class YFinanceFetcher(BaseFetcher):
             cal["next_earnings_date"] = None
             cal["days_to_earnings"] = None
 
-        # Letzte 4 Quartale EPS
+        # Letzte 4 Quartale EPS (über earnings_dates, da quarterly_earnings deprecated)
         try:
-            hist = t.quarterly_earnings
             beats = []
-            if hist is not None and not hist.empty:
-                for _, row in hist.head(4).iterrows():
-                    actual   = row.get("Reported EPS") or row.get("actual")
-                    estimate = row.get("EPS Estimate")  or row.get("estimate")
+            ed = t.earnings_dates
+            if ed is not None and not ed.empty:
+                past = ed[ed.index <= datetime.now()].head(4)
+                for _, row in past.iterrows():
+                    actual   = row.get("Reported EPS")
+                    estimate = row.get("EPS Estimate")
                     if actual is not None and estimate is not None:
-                        beats.append({
-                            "actual":   float(actual),
-                            "estimate": float(estimate),
-                            "beat":     float(actual) > float(estimate),
-                        })
+                        try:
+                            beats.append({
+                                "actual":   float(actual),
+                                "estimate": float(estimate),
+                                "beat":     float(actual) > float(estimate),
+                            })
+                        except (ValueError, TypeError):
+                            pass
             cal["eps_history"] = beats
         except Exception:
             cal["eps_history"] = []
