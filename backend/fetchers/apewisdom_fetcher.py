@@ -53,9 +53,9 @@ class ApeWisdomFetcher(BaseFetcher):
                 {
                     "ticker":           r.get("ticker", ""),
                     "name":             r.get("name", ""),
-                    "mentions":         int(r.get("mentions", 0)),
-                    "mentions_24h_ago": int(r.get("mentions_24h_ago", 0)),
-                    "rank":             int(r.get("rank", 9999)),
+                    "mentions":         int(r.get("mentions") or 0),
+                    "mentions_24h_ago": int(r.get("mentions_24h_ago") or 0),
+                    "rank":             int(r.get("rank") or 9999),
                 }
                 for r in results
             ]

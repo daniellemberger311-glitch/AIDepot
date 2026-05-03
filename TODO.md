@@ -6,109 +6,79 @@ Zuletzt aktualisiert: 2025-05-03
 
 ## Aktueller Stand
 
-**Phase:** 1 – Backend-Fundament  
-**Branch:** `claude/stock-options-analyzer-umA6s`  
-**Gesamtfortschritt:** ~25 % (Grundstruktur, DB, Backend-Kern, 4 von 8 Fetchern)
+**Phase:** 2 – Scoring-Engine (Phase 1 abgeschlossen ✅)
+**Branch:** `claude/stock-options-analyzer-umA6s`
+**Gesamtfortschritt:** ~40 % (alle Fetcher + DB + Backend-Kern + Universe fertig)
 
 ---
 
-## ✅ Erledigt
+## ✅ Phase 1 – Backend-Fundament (abgeschlossen)
 
 ### Infrastruktur & Konfiguration
-- [x] Projektstruktur mit allen Verzeichnissen angelegt
+- [x] Projektstruktur mit allen Verzeichnissen
 - [x] `.gitignore`, `.env.example`
-- [x] `backend/requirements.txt`
-- [x] `backend/config.py` – Pydantic BaseSettings, liest `.env`
+- [x] `backend/requirements.txt` (inkl. `pydantic-settings`)
+- [x] `backend/config.py` – Pydantic BaseSettings
 
 ### Datenbank
-- [x] `backend/database.py` – SQLite-Engine, SessionLocal, `init_db()`
-- [x] `backend/models.py` – alle SQLAlchemy ORM-Modelle:
-  - `Stock`, `DailyScore`, `ScoreHistory`, `ScoreBreakdown`
-  - `WatchlistEntry`, `OptionsRecommendation`
-  - `Position`, `Transaction`, `ExitSignal`
-  - `NotificationLog`, `SignalQuality`, `ApiCache`, `Configuration`
-- [x] `scripts/init_db.py` – Tabellen erstellen + Standardkonfiguration befüllen
+- [x] `backend/database.py` – SQLite-Engine, init_db()
+- [x] `backend/models.py` – 13 SQLAlchemy ORM-Modelle
+- [x] `scripts/init_db.py`
 
 ### Backend-Kern
-- [x] `backend/schemas.py` – alle Pydantic Request/Response-Typen
-- [x] `backend/main.py` – FastAPI-App, CORS, Lifespan-Hook
+- [x] `backend/schemas.py` – alle Pydantic-Typen
+- [x] `backend/main.py` – FastAPI-App, CORS
+- [x] `backend/cache/store.py` – TTL-Cache
 
-### Cache
-- [x] `backend/cache/store.py` – TTL-Cache (In-Memory + SQLite-Fallback)
+### Fetcher (alle 8 fertig ✅)
+- [x] `backend/fetchers/base.py`
+- [x] `backend/fetchers/yfinance_fetcher.py`
+- [x] `backend/fetchers/stocktwits_fetcher.py`
+- [x] `backend/fetchers/apewisdom_fetcher.py`
+- [x] `backend/fetchers/finnhub_fetcher.py`
+- [x] `backend/fetchers/alphavantage_fetcher.py`
+- [x] `backend/fetchers/marketaux_fetcher.py`
+- [x] `backend/fetchers/simfin_fetcher.py`
 
-### Fetcher (4 von 8)
-- [x] `backend/fetchers/base.py` – BaseFetcher mit Cache-Lookup, Retry-Dekorator
-- [x] `backend/fetchers/yfinance_fetcher.py` – OHLCV, Fundamentals, Earnings, Insider (kein Key)
-- [x] `backend/fetchers/stocktwits_fetcher.py` – Bullish-Ratio, Trending Tickers (kein Key)
-- [x] `backend/fetchers/apewisdom_fetcher.py` – Reddit-Mentions (kein Key)
-- [x] `backend/fetchers/finnhub_fetcher.py` – News-Sentiment, Insider, Earnings, Analyst (60/Min)
+### Universum
+- [x] `backend/universe/loader.py` – 439 Ticker (SP500/NASDAQ100/RUSSELL200)
+
+### Test
+- [x] `scripts/test_fetchers.py` – alle 8 Quellen ✅ (Alpha Vantage: ⚠️ nur ohne Key)
 
 ### Dokumentation
-- [x] `CLAUDE.md` – Projekt-Kontext (automatisch in jeder Session geladen)
-- [x] `docs/ARCHITECTURE.md` – System-Diagramm, Workflows, Schichtenmodell
-- [x] `docs/SCORING.md` – vollständiges Scoring-System mit Punktetabellen
-- [x] `docs/API.md` – alle geplanten REST-Endpunkte
-- [x] `docs/RATE_LIMITS.md` – Strategie für 850 Aktien mit Free-Tier-APIs
-- [x] `docs/SETUP.md` – Schritt-für-Schritt-Einrichtungsanleitung
-- [x] `docs/ROADMAP.md` – Entwicklungs-Roadmap (Phasen 1–5)
+- [x] `CLAUDE.md`, `docs/ARCHITECTURE.md`, `docs/SCORING.md`
+- [x] `docs/API.md`, `docs/RATE_LIMITS.md`, `docs/SETUP.md`, `docs/ROADMAP.md`
 
 ---
 
-## 🔄 Nächste Schritte (Phase 1 – Rest)
+## 🔄 Phase 2 – Scoring-Engine (als nächstes)
 
-### Fetcher (4 noch offen)
-- [ ] `backend/fetchers/alphavantage_fetcher.py` – technische Indikatoren (25/Tag-Limit!)
-- [ ] `backend/fetchers/marketaux_fetcher.py` – News + Sentiment (100/Tag)
-- [ ] `backend/fetchers/simfin_fetcher.py` – KGV, EPS, FCF, Verschuldung
+- [ ] `backend/scoring/fundamental.py` – 7 Kriterien, max. 40 Punkte
+- [ ] `backend/scoring/technical.py` – VCP + 6 Indikatoren, max. 35 Punkte
+- [ ] `backend/scoring/sentiment.py` – 4 Kriterien + Unterdrückungslogik, max. 25 Punkte
+- [ ] `backend/scoring/delta.py` – Δ1T, Δ7T, Δ30T
+- [ ] `backend/scoring/options.py` – OS-Parameter-Ableitung
+- [ ] `backend/scoring/orchestrator.py` – Hauptkoordinator, schreibt in DB
 
-### Scoring-Engine
-- [ ] `backend/scoring/fundamental.py` – Ebene 1: 7 Kriterien, max. 40 Punkte
-- [ ] `backend/scoring/technical.py` – Ebene 2: VCP + 6 weitere, max. 35 Punkte
-- [ ] `backend/scoring/sentiment.py` – Ebene 3 + Unterdrückungslogik, max. 25 Punkte
-- [ ] `backend/scoring/delta.py` – Δ1T, Δ7T, Δ30T aus `score_history`
-- [ ] `backend/scoring/options.py` – Optionsschein-Parameter-Ableitung
-- [ ] `backend/scoring/orchestrator.py` – Hauptkoordinator aller 3 Ebenen
-
-### Universum
-- [ ] `backend/universe/loader.py` – S&P 500, NASDAQ 100, Russell 2000, persönliche Liste
-
-### API-Endpunkte
-- [ ] `backend/api/router.py`
-- [ ] `backend/api/watchlist.py` – GET /api/watchlist
-- [ ] `backend/api/signals.py` – GET /api/signals/{ticker}
-- [ ] `backend/api/portfolio.py` – CRUD Positionen
-- [ ] `backend/api/dashboard.py` – GET /api/dashboard
-- [ ] `backend/api/history.py` – Trades + Signalqualität
-- [ ] `backend/api/scan.py` – manueller Scan-Trigger
-- [ ] `backend/api/config.py` – Konfiguration lesen/schreiben
-- [ ] `backend/api/universe.py` – Universum verwalten
+**Abschluss-Kriterium:** `orchestrator.score_ticker("AAPL")` schreibt validen Score in DB.
 
 ---
 
 ## 📋 Spätere Phasen
 
-### Phase 2 – Automatisierung
-- [ ] `backend/universe/loader.py` fertigstellen
-- [ ] `backend/scheduler/priority_queue.py`
+### Phase 3 – API + Automatisierung
+- [ ] 9 API-Router (`watchlist`, `signals`, `portfolio`, `dashboard`, `history`, `scan`, `config`, `universe`, `backtest`)
 - [ ] `backend/scheduler/jobs.py` – APScheduler 06:00 UTC
+- [ ] `backend/scheduler/priority_queue.py`
 - [ ] `backend/notifications/telegram.py`
 
-### Phase 3 – Backtesting
-- [ ] `backend/backtesting/historical_data.py`
-- [ ] `backend/backtesting/engine.py`
-- [ ] `backend/backtesting/signal_mapper.py`
-- [ ] `backend/api/backtest.py`
+### Phase 4 – Backtesting
+- [ ] `backend/backtesting/` (3 Module + API-Endpunkt)
 
-### Phase 4 – Frontend
-- [ ] Vite + React + TypeScript Projekt scaffolden
-- [ ] Tailwind CSS konfigurieren
-- [ ] TanStack Query + React Router
-- [ ] 6 Seiten: Dashboard, Watchlist, Signal-Detail, Portfolio, Trade-Historie, Backtesting
-
-### Phase 5 – Lerneffekt & Feintuning
-- [ ] Signal-Qualitäts-Tracking automatisieren
-- [ ] Trefferquote pro Signaltyp im UI
-- [ ] Gewichtungsanpassung (40/35/25) via UI
+### Phase 5 – Frontend
+- [ ] Vite + React + TypeScript scaffolden
+- [ ] 6 Seiten: Dashboard, Watchlist, Signal-Detail, Portfolio, Trade-Historie, Backtest
 
 ---
 
@@ -119,4 +89,4 @@ Zuletzt aktualisiert: 2025-05-03
 | Alpha Vantage 25/Tag | Primär `ta`-Bibliothek + yfinance; AV als Ergänzung |
 | Optionsschein-Stammdaten | Kein Free-API → ISIN + KO manuell eintragen |
 | Historisches Sentiment | Für Backtesting nicht verfügbar → neutral 12,5/25 |
-| yfinance inoffiziell | Hinter Abstraktionsschicht isoliert, leicht austauschbar |
+| yfinance `earnings` deprecated | Warning unterdrücken oder auf `income_stmt` umstellen |

@@ -8,8 +8,8 @@ Branch: `claude/stock-options-analyzer-umA6s`
 ## Übersicht
 
 ```
-Phase 1 │ Backend-Fundament     │ ~25% fertig   │ Aktiv
-Phase 2 │ Scoring-Engine        │ 0%            │ Als nächstes
+Phase 1 │ Backend-Fundament     │ 100% ✅        │ Abgeschlossen
+Phase 2 │ Scoring-Engine        │ 0%            │ Aktiv – als nächstes
 Phase 3 │ API + Automatisierung │ 0%            │ Folgt auf Phase 2
 Phase 4 │ Backtesting-Modul     │ 0%            │ Nach Phase 3
 Phase 5 │ Frontend              │ 0%            │ Parallel zu Phase 3/4
@@ -20,7 +20,7 @@ Phase 5 │ Frontend              │ 0%            │ Parallel zu Phase 3/4
 
 ---
 
-## Phase 1 – Backend-Fundament
+## Phase 1 – Backend-Fundament ✅ ABGESCHLOSSEN
 
 **Ziel:** Alle Datenquellen angebunden, Datenbank läuft, Backend startet fehlerfrei.
 

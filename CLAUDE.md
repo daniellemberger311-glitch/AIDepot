@@ -9,7 +9,7 @@ Ziel: Aktien im Pre-Breakout-Aufbau (VCP-Muster wie ASTS, SNDK, NVDA) frühzeiti
 
 ## Aktueller Entwicklungsstand
 
-**Phase 1 – Backend-Fundament (~25 % fertig)**
+**Phase 1 – Backend-Fundament ✅ abgeschlossen | Phase 2 – Scoring-Engine (aktiv)**
 
 | Modul | Status |
 |-------|--------|
@@ -18,9 +18,8 @@ Ziel: Aktien im Pre-Breakout-Aufbau (VCP-Muster wie ASTS, SNDK, NVDA) frühzeiti
 | `backend/database.py` + `models.py` | ✅ fertig |
 | `backend/schemas.py` + `main.py` | ✅ fertig |
 | `backend/cache/store.py` | ✅ fertig |
-| Fetcher: yfinance, StockTwits, ApeWisdom, Finnhub | ✅ fertig |
-| Fetcher: Alpha Vantage, Marketaux, SimFin | ⏳ offen |
-| Scoring-Engine (3 Ebenen + Orchestrator) | ⏳ offen |
+| Fetcher: alle 8 (yfinance, StockTwits, ApeWisdom, Finnhub, AV, Marketaux, SimFin) | ✅ fertig |
+| Scoring-Engine (3 Ebenen + Orchestrator) | 🔄 aktiv |
 | API-Endpunkte (9 Router) | ⏳ offen |
 | Scheduler + Telegram | ⏳ offen |
 | Backtesting-Modul | ⏳ offen |

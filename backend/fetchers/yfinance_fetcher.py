@@ -30,7 +30,9 @@ class YFinanceFetcher(BaseFetcher):
 
         df = self._fetch_ohlcv(ticker, period, interval)
         if not df.empty:
-            self._cache_set(key, df.reset_index().to_dict("records"), OHLCV_TTL)
+            records = df.reset_index()
+            records["Date"] = records["Date"].astype(str)
+            self._cache_set(key, records.to_dict("records"), OHLCV_TTL)
         return df
 
     @with_retry()
