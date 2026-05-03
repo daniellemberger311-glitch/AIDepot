@@ -1,14 +1,14 @@
 # AIDepot – Offene Aufgaben & Fortschritt
 
-Zuletzt aktualisiert: 2025-05-03
+Zuletzt aktualisiert: 2026-05-03
 
 ---
 
 ## Aktueller Stand
 
-**Phase:** 2 – Scoring-Engine (Phase 1 abgeschlossen ✅)  
+**Phase:** 3 – API-Endpunkte + Scheduler (Phase 2 abgeschlossen ✅)  
 **Branch:** `claude/stock-options-analyzer-umA6s`  
-**Gesamtfortschritt:** ~40 %
+**Gesamtfortschritt:** ~60 %
 
 **Universum:** 703 aktive Ticker (SP500/NASDAQ100/RUSSELL200/Watchlist) + 6.243 Reserve (NYSE/NASDAQ via AV LISTING_STATUS, is_active=0)
 
@@ -75,32 +75,37 @@ Zuletzt aktualisiert: 2025-05-03
 
 ---
 
-## 🔄 Phase 2 – Scoring-Engine (als nächstes)
+## ✅ Phase 2 – Scoring-Engine (abgeschlossen)
 
-- [ ] `backend/scoring/fundamental.py` – 7 Kriterien, max. 40 Punkte
-- [ ] `backend/scoring/technical.py` – VCP + 6 Indikatoren, max. 35 Punkte
-- [ ] `backend/scoring/sentiment.py` – 4 Kriterien + Unterdrückungslogik, max. 25 Punkte
-- [ ] `backend/scoring/delta.py` – Δ1T, Δ7T, Δ30T
-- [ ] `backend/scoring/options.py` – OS-Parameter-Ableitung
-- [ ] `backend/scoring/orchestrator.py` – Hauptkoordinator, schreibt in DB
+- [x] `backend/scoring/fundamental.py` – 7 Kriterien, max. 40 Punkte
+- [x] `backend/scoring/technical.py` – VCP + 6 Indikatoren (ta-Bibliothek), max. 35 Punkte
+- [x] `backend/scoring/sentiment.py` – 4 Kriterien + Unterdrückungslogik, max. 25 Punkte
+- [x] `backend/scoring/delta.py` – Δ1T, Δ7T, Δ30T aus score_history
+- [x] `backend/scoring/options.py` – OS-Parameter-Ableitung (Hebel, Laufzeit, KO, Entry, SL)
+- [x] `backend/scoring/orchestrator.py` – Hauptkoordinator, schreibt in alle 4 Tabellen
 
-**Abschluss-Kriterium:** `orchestrator.score_ticker("AAPL")` schreibt validen Score in DB.
+**Abschluss-Kriterium ✅:** `orchestrator.score_ticker("AAPL")` gibt Score 39/100 (Zone 4) zurück und hat daily_scores, score_history, score_breakdown, watchlist korrekt befüllt.
+
+Test-Ergebnis (ohne Finnhub/SimFin/Marketaux-Keys, nur yfinance + AV):
+- L1 Fundamental: 15/40 | L2 Technical: 17/35 | L3 Sentiment: 7/25
+- VCP: 4 Pkt (1 Kontraktion), RSI in Zone: 5 Pkt, MACD positiv+steigend: 3 Pkt
 
 ---
 
 ## 📋 Spätere Phasen
 
-### Phase 3 – API + Scheduler + Konfigurationsmodul
-- [ ] API-Router: `watchlist`, `signals`, `portfolio`, `dashboard`, `history`, `scan`, `backtest`
-- [ ] `backend/api/config.py` – vollständiges Konfigurationsmodul (siehe Roadmap)
-- [ ] `backend/api/universe.py` – Universum-Verwaltung inkl. manueller Ticker-Eingabe
-- [ ] `backend/scheduler/jobs.py` – APScheduler 06:00 UTC + Wochenplan-Rotation
-- [ ] `backend/scheduler/priority_queue.py` – Tier-Rotation (Mindestfrequenz: wöchentlich)
-- [ ] `backend/notifications/telegram.py`
-- [ ] `backend/universe/loader.py` erweitern:
-  - [ ] DAX 40 (.DE-Ticker) als optionale Quelle
-  - [ ] S&P 400 Mid Cap (Wachstums-Aktien vor S&P-500-Aufnahme)
-  - [ ] Scan-Rotation so konfigurieren, dass alle Aktien min. 1x/Woche gescannt werden
+### Phase 3 – API + Scheduler + Konfigurationsmodul (als nächstes)
+- [ ] `backend/api/watchlist.py` – GET /api/watchlist?zone=&sort=
+- [ ] `backend/api/signals.py` – GET /api/signals/{ticker}
+- [ ] `backend/api/portfolio.py` – CRUD Positionen + Transaktionen
+- [ ] `backend/api/dashboard.py` – GET /api/dashboard
+- [ ] `backend/api/history.py` – GET /api/history/trades + signal-quality
+- [ ] `backend/api/scan.py` – POST /api/scan/trigger (manueller Scan)
+- [ ] `backend/api/config.py` – GET/PUT /api/config (Gewichtungen, Zonen-Grenzen, Alerts)
+- [ ] `backend/api/universe.py` – POST/DELETE /api/universe/ticker (manuell hinzufügen/entfernen)
+- [ ] `backend/scheduler/jobs.py` – APScheduler 06:00 UTC + Quota-Reset + Tier-Rotation
+- [ ] `backend/scheduler/priority_queue.py` – Tier-Priorisierung (Zone 0 → 1 → 2 → 3/4)
+- [ ] `backend/notifications/telegram.py` – alle 4 Benachrichtigungstypen
 
 ### Phase 4 – Backtesting
 - [ ] `backend/backtesting/` (3 Module + API-Endpunkt)
