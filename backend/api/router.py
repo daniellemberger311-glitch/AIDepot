@@ -22,6 +22,7 @@ from backend.api.history    import router as history_router
 from backend.api.scan       import router as scan_router
 from backend.api.config     import router as config_router
 from backend.api.universe   import router as universe_router
+from backend.api.backtest   import router as backtest_router
 
 router = APIRouter()
 
@@ -34,3 +35,4 @@ router.include_router(history_router,    prefix="/history",   tags=["Historie"])
 router.include_router(scan_router,       prefix="/scan",      tags=["Scan"])
 router.include_router(config_router,     prefix="/config",    tags=["Konfiguration"])
 router.include_router(universe_router,   prefix="/universe",  tags=["Universum"])
+router.include_router(backtest_router,   prefix="/backtest",  tags=["Backtesting"])

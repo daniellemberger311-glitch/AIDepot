@@ -57,19 +57,22 @@ Zuletzt aktualisiert: 2026-05-03
 
 ---
 
-## 📋 Phase 4 – Backtesting-Modul (als nächstes)
+## ✅ Phase 4 – Backtesting-Modul (abgeschlossen)
 
-- [ ] `backend/backtesting/historical_data.py` – OHLCV + Fundamentals für Vergangenheit
-- [ ] `backend/backtesting/engine.py` – Score für jeden historischen Tag berechnen
-- [ ] `backend/backtesting/signal_mapper.py` – Signal-Events auf Zeitstrahl projizieren
-- [ ] `backend/api/backtest.py` – `POST /api/backtest` Endpunkt
-- [ ] Router in `backend/api/router.py` einbinden
+- [x] `backend/backtesting/historical_data.py` – OHLCV + Fundamentals (yfinance, TTL-Cache 4h)
+- [x] `backend/backtesting/engine.py` – tägliche Score-Berechnung aus OHLCV-Slices
+- [x] `backend/backtesting/signal_mapper.py` – ZONE_CHANGE, ZONE1_ENTRY, DELTA_SPIKE, STREAK_7D
+- [x] `backend/api/backtest.py` – `POST /api/backtest`, `GET /api/backtest/status/{ticker}`, `DELETE /api/backtest/cache/{ticker}`
+- [x] Router eingebunden → 40 Routen gesamt
 
-**Einschränkung:** Historisches Sentiment nicht verfügbar → neutral 12,5/25
+**Einschränkungen:**
+- Sentiment: immer neutral 12,5/25 (historisch nicht verfügbar)
+- Zeiträume ≤ 1 Jahr: synchron; > 1 Jahr: Background-Job (max. 5 Jahre)
+- EPS-Beat-Streak: vereinfachte Schätzung aus yfinance (keine echte Beat-Historie)
 
 ---
 
-## 📋 Phase 5 – Frontend (7 Seiten)
+## 📋 Phase 5 – Frontend (7 Seiten, als nächstes)
 
 - [ ] Vite + React + TypeScript scaffolden (`frontend/`)
 - [ ] Dashboard (`/`) – P&L, Top-5 Zone 1, Exit-Warnungen

@@ -9,7 +9,7 @@ Ziel: Aktien im Pre-Breakout-Aufbau (VCP-Muster wie ASTS, SNDK, NVDA) frühzeiti
 
 ## Aktueller Entwicklungsstand
 
-**Phase 1 ✅ abgeschlossen | Phase 2 ✅ abgeschlossen | Phase 3 ✅ abgeschlossen | Phase 4 – Backtesting (als nächstes)**
+**Phase 1 ✅ | Phase 2 ✅ | Phase 3 ✅ | Phase 4 ✅ abgeschlossen | Phase 5 – Frontend (als nächstes)**
 
 | Modul | Status |
 |-------|--------|
@@ -21,9 +21,9 @@ Ziel: Aktien im Pre-Breakout-Aufbau (VCP-Muster wie ASTS, SNDK, NVDA) frühzeiti
 | `backend/log_handler.py` + `backend/api/logs.py` | ✅ fertig |
 | Fetcher: alle 8 + Key-Rotation AV | ✅ fertig |
 | Scoring-Engine: 6 Module + Orchestrator | ✅ fertig |
-| API-Endpunkte: 35 Routen (watchlist, signals, portfolio, dashboard, history, scan, config, universe) | ✅ fertig |
+| API-Endpunkte: 40 Routen (watchlist, signals, portfolio, dashboard, history, scan, config, universe, backtest) | ✅ fertig |
 | Scheduler (APScheduler 06:00 UTC) + Telegram-Bot | ✅ fertig |
-| Backtesting-Modul | ⏳ offen – Phase 4 |
+| Backtesting-Modul | ✅ fertig |
 | Frontend (React + Vite) | ⏳ offen – Phase 5 |
 
 Detaillierter Fortschritt → `TODO.md`  
@@ -86,7 +86,10 @@ AIDepot/
 │   │   └── telegram.py    ← 5 Nachrichtentypen + Dispatcher
 │   ├── cache/             ← TTL-Cache (In-Memory + SQLite)
 │   ├── universe/          ← ~850 Ticker-Universum
-│   └── backtesting/       ← Historische Signal-Simulation – Phase 4 ⏳
+│   └── backtesting/       ← Historische Signal-Simulation (✅)
+│       ├── historical_data.py ← OHLCV + Fundamentals (yfinance, gecacht)
+│       ├── engine.py          ← Tägliche Score-Berechnung aus OHLCV-Slices
+│       └── signal_mapper.py   ← Event-Erkennung (ZONE_CHANGE, SPIKE, STREAK)
 ├── frontend/              ← Vite + React + TypeScript (Port 5173) – Phase 5
 └── scripts/
     ├── init_db.py         ← DB initialisieren (einmalig)

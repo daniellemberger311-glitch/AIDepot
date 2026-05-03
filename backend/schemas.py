@@ -231,3 +231,4 @@ class BacktestResult(BaseModel):
     signals: list[BacktestSignalEvent]
     total_signals: int
     zone1_entries: int
+    summary: Optional[dict] = None
