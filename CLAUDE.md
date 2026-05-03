@@ -9,7 +9,7 @@ Ziel: Aktien im Pre-Breakout-Aufbau (VCP-Muster wie ASTS, SNDK, NVDA) frühzeiti
 
 ## Aktueller Entwicklungsstand
 
-**Phase 1 ✅ abgeschlossen | Phase 2 ✅ abgeschlossen | Phase 3 – API + Scheduler (aktiv)**
+**Phase 1 ✅ abgeschlossen | Phase 2 ✅ abgeschlossen | Phase 3 ✅ abgeschlossen | Phase 4 – Backtesting (als nächstes)**
 
 | Modul | Status |
 |-------|--------|
@@ -21,10 +21,10 @@ Ziel: Aktien im Pre-Breakout-Aufbau (VCP-Muster wie ASTS, SNDK, NVDA) frühzeiti
 | `backend/log_handler.py` + `backend/api/logs.py` | ✅ fertig |
 | Fetcher: alle 8 + Key-Rotation AV | ✅ fertig |
 | Scoring-Engine: 6 Module + Orchestrator | ✅ fertig |
-| API-Endpunkte (router + logs) | 🔄 teilweise – Phase 3 aktiv |
-| Scheduler + Telegram | ⏳ offen |
-| Backtesting-Modul | ⏳ offen |
-| Frontend (React + Vite) | ⏳ offen |
+| API-Endpunkte: 35 Routen (watchlist, signals, portfolio, dashboard, history, scan, config, universe) | ✅ fertig |
+| Scheduler (APScheduler 06:00 UTC) + Telegram-Bot | ✅ fertig |
+| Backtesting-Modul | ⏳ offen – Phase 4 |
+| Frontend (React + Vite) | ⏳ offen – Phase 5 |
 
 Detaillierter Fortschritt → `TODO.md`  
 Entwicklungs-Roadmap → `docs/ROADMAP.md`
@@ -60,22 +60,33 @@ AIDepot/
 │   ├── log_handler.py     ← MemoryLogHandler (Ringpuffer 1000 Einträge)
 │   ├── models.py          ← SQLAlchemy ORM-Modelle (13 Tabellen)
 │   ├── schemas.py         ← Pydantic Request/Response-Typen
-│   ├── api/
-│   │   ├── router.py      ← Zentraler Router (sammelt alle Sub-Router)
-│   │   └── logs.py        ← GET /api/logs (implementiert ✅)
-│   ├── fetchers/          ← 8 Datenquellen-Adapter
-│   ├── scoring/           ← 3-Ebenen-Scoring-Engine (6 Module, implementiert ✅)
+│   ├── api/               ← 35 REST-Endpunkte (✅ Phase 3 abgeschlossen)
+│   │   ├── router.py      ← Zentraler Router
+│   │   ├── logs.py        ← GET /api/logs
+│   │   ├── watchlist.py   ← GET /api/watchlist
+│   │   ├── signals.py     ← GET /api/signals/{ticker}
+│   │   ├── portfolio.py   ← CRUD Positionen + Exit-Signale
+│   │   ├── dashboard.py   ← GET /api/dashboard
+│   │   ├── history.py     ← Trade-Archiv + Signalqualität
+│   │   ├── scan.py        ← POST /api/scan/trigger
+│   │   ├── config.py      ← GET/PUT /api/config + Status
+│   │   └── universe.py    ← Ticker-CRUD + Suche + Refresh
+│   ├── fetchers/          ← 8 Datenquellen-Adapter (✅)
+│   ├── scoring/           ← 3-Ebenen-Scoring-Engine (✅)
 │   │   ├── fundamental.py ← L1: 7 Kriterien, max. 40 Pkt.
 │   │   ├── technical.py   ← L2: VCP + 6 Indikatoren, max. 35 Pkt.
 │   │   ├── sentiment.py   ← L3: 4 Kriterien + Unterdrückung, max. 25 Pkt.
 │   │   ├── delta.py       ← Δ1T / Δ7T / Δ30T
 │   │   ├── options.py     ← OS-Parameter-Ableitung (nur Zone 1)
 │   │   └── orchestrator.py← Hauptkoordinator, schreibt in 4 DB-Tabellen
-│   ├── scheduler/         ← APScheduler (06:00 UTC täglich) – Phase 3
-│   ├── notifications/     ← Telegram-Bot – Phase 3
+│   ├── scheduler/         ← APScheduler tägl. 06:00 UTC (✅)
+│   │   ├── jobs.py        ← Scan + Exit-Check + Notifications + Wartung
+│   │   └── priority_queue.py ← Tier-0→3-Reihenfolge + Zone-4-Rotation
+│   ├── notifications/     ← Telegram-Bot (✅)
+│   │   └── telegram.py    ← 5 Nachrichtentypen + Dispatcher
 │   ├── cache/             ← TTL-Cache (In-Memory + SQLite)
 │   ├── universe/          ← ~850 Ticker-Universum
-│   └── backtesting/       ← Historische Signal-Simulation – Phase 4
+│   └── backtesting/       ← Historische Signal-Simulation – Phase 4 ⏳
 ├── frontend/              ← Vite + React + TypeScript (Port 5173) – Phase 5
 └── scripts/
     ├── init_db.py         ← DB initialisieren (einmalig)
@@ -115,7 +126,7 @@ Log-Übersicht: http://localhost:8000/api/logs?level=ERROR
 
 ## Wichtige Konventionen
 
-- **Git-Branch:** `claude/stock-options-analyzer-umA6s`
+- **Git-Branch:** `main` (direkte Entwicklung, kein Feature-Branch außer explizit angewiesen)
 - **Sprache:** Kommentare, Commits, Docs auf Deutsch; Code-Identifiers auf Englisch
 - **Keine Auth:** Single-User, localhost only, kein Cloud-Zwang
 - **Rate-Limits immer beachten:** Alpha Vantage (50/Tag mit 2 Keys, je 25), Finnhub (60/Min) – Details in `docs/RATE_LIMITS.md`
