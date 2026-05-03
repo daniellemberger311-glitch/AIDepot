@@ -8,7 +8,7 @@
 | StockTwits | inoffiziell, ~1 Req/2s | ✅ 2s-Sleep zwischen Calls |
 | ApeWisdom | kein Limit | ✅ 1h-Cache |
 | Finnhub | **60 Calls/Minute** | ✅ 1s-Sleep + 1h-Cache |
-| **Alpha Vantage** | **5 Calls/Minute + 25/Tag** | ✅ 13s-Mindestabstand + Tageszähler |
+| **Alpha Vantage** | **5 Calls/Min + 25/Tag/Key** | ✅ 13s-Mindestabstand + Key-Rotation (2 Keys = 50/Tag) |
 | Marketaux | 100 News/Tag | ✅ Tageszähler in DB |
 | SimFin | kein Limit (privat) | ✅ 24h-Cache |
 
@@ -19,9 +19,13 @@
 Das ist die kritischste Datenquelle, weil **zwei unabhängige Limits** gleichzeitig gelten:
 
 ```
-Täglich:    max. 25 Calls/Tag
-Pro Minute: max. 5 Calls/Minute → 1 Call alle 12 Sekunden
+Täglich:    max. 25 Calls/Tag pro Key  →  mit 2 Keys: 50 Calls/Tag gesamt
+Pro Minute: max. 5 Calls/Minute        →  1 Call alle 12 Sekunden (13s mit Puffer)
 ```
+
+**Key-Rotation (implementiert):** Key 1 wird zuerst verwendet. Sobald sein Tageslimit
+erreicht ist, übernimmt automatisch Key 2. Beide Quoten werden separat in der
+`configuration`-Tabelle verfolgt (`av_calls_today` und `av_calls_today_2`).
 
 ### Wie es implementiert ist
 

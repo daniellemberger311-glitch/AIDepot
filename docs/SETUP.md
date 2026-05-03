@@ -62,7 +62,8 @@ npm run dev
 
 | Dienst | Variable | Limit | Status |
 |--------|----------|-------|--------|
-| Alpha Vantage | `ALPHA_VANTAGE_API_KEY` | 25 Calls/Tag, 5/Min | ✅ konfiguriert |
+| Alpha Vantage (Key 1) | `ALPHA_VANTAGE_API_KEY` | 25 Calls/Tag, 5/Min | ✅ konfiguriert |
+| Alpha Vantage (Key 2) | `ALPHA_VANTAGE_API_KEY_2` | +25 Calls/Tag (Rotation) | ✅ konfiguriert |
 | Finnhub | `FINNHUB_API_KEY` | 60 Calls/Min | ✅ konfiguriert |
 | Marketaux | `MARKETAUX_API_KEY` | 100 News/Tag | ✅ konfiguriert |
 | SimFin | `SIMFIN_API_KEY` | unbegrenzt (privat) | ✅ konfiguriert |

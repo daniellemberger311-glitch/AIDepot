@@ -6,6 +6,7 @@ from pathlib import Path
 class Settings(BaseSettings):
     finnhub_api_key: str = ""
     alpha_vantage_api_key: str = ""
+    alpha_vantage_api_key_2: str = ""   # Zweiter Key → 25+25 = 50 Calls/Tag
     marketaux_api_key: str = ""
     simfin_api_key: str = ""
 
