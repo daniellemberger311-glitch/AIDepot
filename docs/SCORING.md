@@ -1,5 +1,8 @@
 # Scoring-System: Vollständige Dokumentation
 
+> **Status:** ✅ vollständig implementiert in `backend/scoring/`  
+> Module: `fundamental.py`, `technical.py`, `sentiment.py`, `delta.py`, `options.py`, `orchestrator.py`
+
 ## Übersicht
 
 Jede Aktie erhält täglich einen **Gesamtscore von 0–100**, der sich aus drei Ebenen zusammensetzt:
@@ -26,7 +29,9 @@ Jede Aktie erhält täglich einen **Gesamtscore von 0–100**, der sich aus drei
 | Insider-Käufe netto (90 Tage) | 5 | ≥3 Käufe → 5; 1–2 → 3; neutral → 1; Verkäufe netto → 0 |
 | Earnings-Nähe (Katalysator) | 5 | 7–14 Tage vorher → 5; 3–7 Tage → 3; >14 Tage → 1 |
 
-**Datenquellen:** yfinance (Fundamentals, Earnings), SimFin (KGV/FCF/EPS), Finnhub (Insider)
+**Datenquellen:** yfinance (Fundamentals, Earnings), SimFin (KGV/FCF/EPS + Bilanz für D/E), Finnhub (Insider)
+
+**Hinweis D/E-Ratio:** SimFin liefert D/E direkt aus der Bilanz (`Long Term Debt + Short Term Debt / Total Equity`). Fallback: yfinance `debtToEquity` (wird durch 100 normalisiert, da yfinance den Wert als Prozent ausgibt, z. B. 50.0 = 0,5×).
 
 ---
 
@@ -64,6 +69,8 @@ Das VCP-Muster nach Minervini ist der wichtigste technische Indikator:
 | StockTwits Bullish-Ratio | 7 | >65% → 7; 55–65% → 5; 45–55% → 3; <45% → 0 |
 | Reddit-Mention-Momentum | 5 | ApeWisdom: +50% vs. 7T-Ø → 5; +20–50% → 3; flach → 1 |
 | Analysten Upgrade/Downgrade | 5 | ≥2 Netto-Upgrades (30T) → 5; 1 → 3; neutral → 1; Downgrade → 0 |
+
+**Hinweis für deutsche Aktien (`.DE`-Suffix):** StockTwits und ApeWisdom sind US-exklusive Dienste. Für Ticker wie `SAP.DE` werden diese Quellen übersprungen und Standardwerte eingesetzt (Bullish-Ratio: neutral 3/7 Punkte, Reddit-Momentum: 1/5 Punkte). Finnhub-Aufrufe normalisieren das Symbol automatisch (`SAP.DE` → `SAP`).
 
 ### Unterdrückungslogik
 
@@ -111,12 +118,14 @@ Abgeleitet aus Score-Kontext + ATR:
 
 | Parameter | Logik |
 |-----------|-------|
-| Richtung | CALL (steigendes Δ7T) |
-| Hebel | ATR/Kurs < 2% → 5x; 2–3% → 6x; >3% → 7x |
+| Richtung | CALL (Standard); PUT nur wenn Δ7T < −5 |
+| Hebel | ATR/Kurs < 2% → 5–6x; 2–3% → 5–7x; >3% → 6–8x |
 | Laufzeit | 8 Wochen Basis; +2 Wochen wenn Earnings ≤ 6 Wochen |
 | KO-Abstand | max(12%, 3 × ATR%) |
-| Einstieg | Breakout über Pivot mit Volumen > 200% des 50T-Ø |
+| Einstieg | Aktueller Kurs × 1,02 (2% über aktuellem Niveau) |
 | Stop-Loss | Letzter Pivot-Tief (aus OHLCV) |
+
+> **Hebelbereich statt Fixwert:** Die Empfehlung gibt immer eine Range aus (`leverage_min`/`leverage_max`), da das optimale Niveau von Volatilität und Restlaufzeit des konkreten Scheins abhängt.
 
 ---
 

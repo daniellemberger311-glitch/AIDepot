@@ -3,11 +3,13 @@
 Basis-URL: `http://localhost:8000/api`  
 Swagger-UI: `http://localhost:8000/docs`
 
+**Status-Legende:** ✅ implementiert | ⏳ Phase 3 | ⏳ Phase 4
+
 ---
 
 ## Dashboard
 
-### `GET /api/dashboard`
+### `GET /api/dashboard` ⏳ Phase 3
 Gesamtübersicht für die Startseite.
 
 **Response:**
@@ -25,7 +27,7 @@ Gesamtübersicht für die Startseite.
 
 ## Watchlist
 
-### `GET /api/watchlist`
+### `GET /api/watchlist` ⏳ Phase 3
 Alle Aktien nach Zone und Score.
 
 **Query-Parameter:**
@@ -39,7 +41,7 @@ Alle Aktien nach Zone und Score.
 
 ## Signale
 
-### `GET /api/signals/{ticker}`
+### `GET /api/signals/{ticker}` ⏳ Phase 3
 Vollständige Signal-Analyse für einen Ticker.
 
 **Response:**
@@ -68,10 +70,10 @@ Vollständige Signal-Analyse für einen Ticker.
 
 ## Portfolio
 
-### `GET /api/portfolio/positions`
+### `GET /api/portfolio/positions` ⏳ Phase 3
 Alle offenen Positionen mit aktuellem Status.
 
-### `POST /api/portfolio/positions`
+### `POST /api/portfolio/positions` ⏳ Phase 3
 Neue Position erfassen.
 
 **Body:**
@@ -90,7 +92,7 @@ Neue Position erfassen.
 }
 ```
 
-### `PATCH /api/portfolio/positions/{id}/close`
+### `PATCH /api/portfolio/positions/{id}/close` ⏳ Phase 3
 Position schließen und P&L berechnen.
 
 **Body:**
@@ -101,46 +103,46 @@ Position schließen und P&L berechnen.
 }
 ```
 
-### `GET /api/portfolio/exit-signals`
+### `GET /api/portfolio/exit-signals` ⏳ Phase 3
 Alle offenen Exit-Signale (sortiert nach Priorität).
 
-### `PATCH /api/portfolio/exit-signals/{id}/acknowledge`
+### `PATCH /api/portfolio/exit-signals/{id}/acknowledge` ⏳ Phase 3
 Exit-Signal als gelesen markieren.
 
 ---
 
 ## Trade-Historie
 
-### `GET /api/history/trades`
+### `GET /api/history/trades` ⏳ Phase 3
 Alle abgeschlossenen Trades.
 
 **Query-Parameter:**
 - `limit` (optional): Standard 100
 
-### `GET /api/history/signal-quality`
+### `GET /api/history/signal-quality` ⏳ Phase 4
 Trefferquote pro Signaltyp für den Lerneffekt.
 
 ---
 
 ## Scan
 
-### `POST /api/scan/trigger`
+### `POST /api/scan/trigger` ⏳ Phase 3
 Manuellen Scan starten (ohne auf 06:00 UTC zu warten).
 
 **Query-Parameter:**
 - `ticker` (optional): Nur diesen einen Ticker scannen
 
-### `GET /api/scan/status`
+### `GET /api/scan/status` ⏳ Phase 3
 Status des letzten Scans (Zeitstempel, Anzahl Ticker, Dauer).
 
 ---
 
 ## Konfiguration
 
-### `GET /api/config`
+### `GET /api/config` ⏳ Phase 3
 Aktuelle Einstellungen laden.
 
-### `PUT /api/config`
+### `PUT /api/config` ⏳ Phase 3
 Einstellungen aktualisieren (Gewichtungen, Schwellenwerte, Telegram).
 
 **Body:** (alle Felder optional)
@@ -155,26 +157,104 @@ Einstellungen aktualisieren (Gewichtungen, Schwellenwerte, Telegram).
 }
 ```
 
+### `GET /api/config/status` ⏳ Phase 3
+Quota-Status aller APIs + letzter Scan-Zeitstempel.
+
+**Response:**
+```json
+{
+  "alpha_vantage": {
+    "total_remaining": 38,
+    "limit_per_day": 25,
+    "keys": [
+      { "slot": "alpha_vantage_api_key", "remaining": 18 },
+      { "slot": "alpha_vantage_api_key_2", "remaining": 20 }
+    ],
+    "min_interval_secs": 13.0
+  },
+  "last_scan_at": "2026-05-03T06:02:11Z",
+  "last_scan_tickers": 842
+}
+```
+
 ---
 
 ## Universum
 
-### `GET /api/universe`
+### `GET /api/universe` ⏳ Phase 3
 Alle Aktien im Universum mit Quellen.
 
-### `POST /api/universe`
+### `GET /api/universe/search` ⏳ Phase 3
+Ticker oder Name suchen.
+
+**Query-Parameter:**
+- `q`: Suchbegriff (Ticker oder Firmenname)
+- `limit` (optional): Standard 20
+
+### `POST /api/universe/add` ⏳ Phase 3
 Aktie zur persönlichen Watchlist hinzufügen.
 
 **Body:** `{ "ticker": "ASTS", "name": "AST SpaceMobile" }`
 
-### `DELETE /api/universe/{ticker}`
+### `DELETE /api/universe/{ticker}` ⏳ Phase 3
 Aktie aus persönlicher Watchlist entfernen.
+
+### `POST /api/universe/refresh` ⏳ Phase 3
+Universum neu laden (S&P 500, NASDAQ 100, Russell 2000, Trending von StockTwits).  
+Dauert ~1–2 Minuten. Gibt die Anzahl neu hinzugefügter Ticker zurück.
+
+---
+
+## Logs
+
+### `GET /api/logs` ✅
+In-Memory-Logs der laufenden Backend-Instanz abrufen.
+
+**Query-Parameter:**
+- `level` (optional): `DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL`
+- `module` (optional): Teilstring des Modulnamens (z. B. `alphavantage`)
+- `limit` (optional): 1–1000, Standard 200
+- `since` (optional): ISO-Zeitstempel – nur Einträge nach diesem Zeitpunkt
+
+**Response:**
+```json
+[
+  {
+    "timestamp": "2026-05-03T06:02:11.234Z",
+    "level": "WARNING",
+    "module": "backend.fetchers.alphavantage_fetcher",
+    "message": "Alpha Vantage Rate-Limit-Antwort (Slot alpha_vantage_api_key): Thank you..."
+  }
+]
+```
+
+### `GET /api/logs/summary` ✅
+Kompaktzusammenfassung: letzte 10 Fehler + Zähler.
+
+**Response:**
+```json
+{
+  "error_count": 2,
+  "warning_count": 7,
+  "last_errors": [
+    {
+      "timestamp": "2026-05-03T06:01:55.100Z",
+      "level": "ERROR",
+      "module": "backend.fetchers.finnhub_fetcher",
+      "message": "Finnhub API timeout: AAPL"
+    }
+  ]
+}
+```
+
+### `DELETE /api/logs` ✅
+Log-Puffer leeren.
 
 ---
 
 ## Backtesting
 
-### `POST /api/backtest`
+### `POST /api/backtest` ⏳ Phase 3
 Historische Signal-Simulation für einen Ticker.
 
 **Body:**
