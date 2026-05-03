@@ -6,9 +6,9 @@ Zuletzt aktualisiert: 2026-05-03
 
 ## Aktueller Stand
 
-**Phase:** 3 – API-Endpunkte + Scheduler (Phase 2 abgeschlossen ✅)  
-**Branch:** `claude/stock-options-analyzer-umA6s`  
-**Gesamtfortschritt:** ~60 %
+**Phase:** 3 ✅ abgeschlossen – API + Scheduler + Notifications  
+**Branch:** `claude/phase-3-development-TiEnW`  
+**Gesamtfortschritt:** ~75 %
 
 **Universum:** 703 aktive Ticker (SP500/NASDAQ100/RUSSELL200/Watchlist) + 6.243 Reserve (NYSE/NASDAQ via AV LISTING_STATUS, is_active=0)
 
@@ -19,6 +19,7 @@ Zuletzt aktualisiert: 2026-05-03
 | Dienst | Umgebungsvariable | Wo beantragen | Limit Free Tier | Status |
 |--------|------------------|---------------|-----------------|--------|
 | Alpha Vantage | `ALPHA_VANTAGE_API_KEY` | alphavantage.co | 25/Tag, 5/Min | ✅ eingetragen |
+| Alpha Vantage 2 | `ALPHA_VANTAGE_API_KEY_2` | alphavantage.co | +25/Tag (Rotation) | ✅ eingetragen |
 | Finnhub | `FINNHUB_API_KEY` | finnhub.io/register | 60 Calls/Min | ⏳ fehlt noch |
 | Marketaux | `MARKETAUX_API_KEY` | marketaux.com | 100 News/Tag | ⏳ fehlt noch |
 | SimFin | `SIMFIN_API_KEY` | simfin.com/api | unbegrenzt (privat) | ⏳ fehlt noch |
@@ -36,7 +37,7 @@ Zuletzt aktualisiert: 2026-05-03
 ### Infrastruktur & Konfiguration
 - [x] Projektstruktur mit allen Verzeichnissen
 - [x] `.gitignore`, `.env.example`
-- [x] `backend/requirements.txt` (inkl. `pydantic-settings`)
+- [x] `backend/requirements.txt` (inkl. `pydantic-settings`, `apscheduler`, `python-telegram-bot`)
 - [x] `backend/config.py` – Pydantic BaseSettings
 
 ### Datenbank
@@ -63,8 +64,7 @@ Zuletzt aktualisiert: 2026-05-03
 - [x] `backend/universe/loader.py`
   - 703 aktive Ticker (SP500 ~470, NASDAQ100 27, RUSSELL200 198, WATCHLIST 8)
   - 6.243 Reserve-Ticker (NYSE/NASDAQ via AV LISTING_STATUS, deaktiviert)
-  - Wikipedia-Fetch (funktioniert auf eigenem Rechner, wöchentliche Aktualisierung)
-  - ⚠️ Listen sind Stand Q1 2025 – mit Wikipedia-Fetch auf eigenem Rechner aktualisierbar
+  - `refresh_universe()` – kombiniert Wikipedia-Fetch + AV LISTING_STATUS
 
 ### Test
 - [x] `scripts/test_fetchers.py` – alle 8 Quellen ✅
@@ -84,31 +84,88 @@ Zuletzt aktualisiert: 2026-05-03
 - [x] `backend/scoring/options.py` – OS-Parameter-Ableitung (Hebel, Laufzeit, KO, Entry, SL)
 - [x] `backend/scoring/orchestrator.py` – Hauptkoordinator, schreibt in alle 4 Tabellen
 
-**Abschluss-Kriterium ✅:** `orchestrator.score_ticker("AAPL")` gibt Score 39/100 (Zone 4) zurück und hat daily_scores, score_history, score_breakdown, watchlist korrekt befüllt.
+**Abschluss-Test:** `score_ticker("AAPL")` → Score 39/100, Zone 4, alle 4 DB-Tabellen befüllt ✅
 
-Test-Ergebnis (ohne Finnhub/SimFin/Marketaux-Keys, nur yfinance + AV):
-- L1 Fundamental: 15/40 | L2 Technical: 17/35 | L3 Sentiment: 7/25
-- VCP: 4 Pkt (1 Kontraktion), RSI in Zone: 5 Pkt, MACD positiv+steigend: 3 Pkt
+---
+
+## ✅ Phase 3 – API + Scheduler + Notifications (abgeschlossen)
+
+### API-Endpunkte (35 Routen gesamt)
+
+- [x] `backend/api/_helpers.py` – gemeinsame `build_score_out()`-Funktion
+- [x] `backend/api/router.py` – zentraler Router, alle Sub-Router eingebunden
+- [x] `backend/api/logs.py` – GET /api/logs (bereits Phase 2)
+- [x] `backend/api/watchlist.py`
+  - `GET /api/watchlist` – Zone-Filter, Sortierung, optionaler Breakdown
+  - `GET /api/watchlist/zones/summary` – Anzahl Aktien pro Zone
+- [x] `backend/api/signals.py`
+  - `GET /api/signals/{ticker}` – vollständiges Signal inkl. OS-Empfehlung
+  - `GET /api/signals/{ticker}/history` – Score-Verlauf (30T-Chart)
+- [x] `backend/api/portfolio.py`
+  - `GET /api/portfolio` – offene + optionale geschlossene Positionen
+  - `POST /api/portfolio` – Position anlegen (BUY-Transaktion automatisch)
+  - `GET /api/portfolio/{id}` – Positionsdetail mit Exit-Signalen
+  - `PUT /api/portfolio/{id}/close` – schließen (SELL + P&L-Berechnung)
+  - `DELETE /api/portfolio/{id}` – löschen
+  - `POST /api/portfolio/{id}/check-exits` – Exit-Signale generieren
+  - `PUT /api/portfolio/signals/{id}/acknowledge` – Signal quittieren
+  - `GET /api/portfolio/{id}/transactions` – alle Transaktionen
+- [x] `backend/api/dashboard.py`
+  - `GET /api/dashboard` – P&L, offene Positionen, Top-5 Z1, Exit-Warnungen
+- [x] `backend/api/history.py`
+  - `GET /api/history/trades` – Trade-Archiv (SELL-Transaktionen)
+  - `GET /api/history/signal-quality` – Trefferquote pro Signaltyp
+  - `GET /api/history/summary` – aggregierte P&L-Kennzahlen
+- [x] `backend/api/scan.py`
+  - `POST /api/scan/trigger` – Scan als Background-Task starten (HTTP 202)
+  - `GET /api/scan/status` – Fortschritt + letzter Abschluss
+  - `POST /api/scan/ticker/{ticker}` – Einzel-Ticker synchron scannen
+- [x] `backend/api/config.py`
+  - `GET /api/config` – alle Einstellungen
+  - `PUT /api/config` – PATCH-Semantik, Gewichtungs-Validierung
+  - `GET /api/config/status` – API-Key-Status aller 8 Dienste
+  - `GET /api/config/scan-schedule` – Scan-Zeitplan + Zone-4-Rotation-Info
+- [x] `backend/api/universe.py`
+  - `GET /api/universe` – alle Ticker (aktiv/inaktiv, nach Quelle filtern)
+  - `GET /api/universe/stats` – Anzahl pro Quelle
+  - `GET /api/universe/search` – Reserve-Suche (is_active=0)
+  - `POST /api/universe/add` – Ticker manuell hinzufügen (WATCHLIST)
+  - `DELETE /api/universe/{ticker}` – deaktivieren (Scores bleiben erhalten)
+  - `POST /api/universe/refresh` – Wikipedia + AV LISTING_STATUS aktualisieren
+
+### Scheduler
+- [x] `backend/scheduler/priority_queue.py` – Tier-Reihenfolge + Zone-4-Rotation
+- [x] `backend/scheduler/jobs.py`
+  - `job_daily_scan()` – tägl. 06:00 UTC
+  - `job_check_exit_signals()` – tägl. 06:30 UTC
+  - `job_send_notifications()` – tägl. 07:00 UTC
+  - `job_weekly_maintenance()` – So 02:00 UTC (Cache + Wikipedia-Refresh)
+
+### Notifications
+- [x] `backend/notifications/telegram.py`
+  - `notify_zone_change()` – Zonenänderung
+  - `notify_delta_spike()` – Δ1T-Spike ≥ alert_delta_1d
+  - `notify_streak_7d()` – 7-Tage-Aufwärtstrend
+  - `notify_exit_signal()` – EXIT-Warnung
+  - `send_daily_summary()` – Tages-Zusammenfassung
+  - `dispatch_scan_notifications()` – Post-Scan-Dispatcher
+  - `send_test_message()` – Verbindungstest
+
+**Abschluss-Kriterium ✅:**
+1. `POST /api/scan/trigger` startet Scan (HTTP 202)
+2. `GET /api/watchlist` liefert Ergebnisse
+3. `GET /api/config/status` zeigt API-Key-Statusübersicht
+4. Scheduler läuft (`GET /health` zeigt Scheduler-Info)
 
 ---
 
 ## 📋 Spätere Phasen
 
-### Phase 3 – API + Scheduler + Konfigurationsmodul (als nächstes)
-- [ ] `backend/api/watchlist.py` – GET /api/watchlist?zone=&sort=
-- [ ] `backend/api/signals.py` – GET /api/signals/{ticker}
-- [ ] `backend/api/portfolio.py` – CRUD Positionen + Transaktionen
-- [ ] `backend/api/dashboard.py` – GET /api/dashboard
-- [ ] `backend/api/history.py` – GET /api/history/trades + signal-quality
-- [ ] `backend/api/scan.py` – POST /api/scan/trigger (manueller Scan)
-- [ ] `backend/api/config.py` – GET/PUT /api/config (Gewichtungen, Zonen-Grenzen, Alerts)
-- [ ] `backend/api/universe.py` – POST/DELETE /api/universe/ticker (manuell hinzufügen/entfernen)
-- [ ] `backend/scheduler/jobs.py` – APScheduler 06:00 UTC + Quota-Reset + Tier-Rotation
-- [ ] `backend/scheduler/priority_queue.py` – Tier-Priorisierung (Zone 0 → 1 → 2 → 3/4)
-- [ ] `backend/notifications/telegram.py` – alle 4 Benachrichtigungstypen
-
 ### Phase 4 – Backtesting
-- [ ] `backend/backtesting/` (3 Module + API-Endpunkt)
+- [ ] `backend/backtesting/historical_data.py` – OHLCV + Fundamentals für Vergangenheit
+- [ ] `backend/backtesting/engine.py` – Score für jeden historischen Tag berechnen
+- [ ] `backend/backtesting/signal_mapper.py` – Signal-Events auf Zeitstrahl projizieren
+- [ ] `backend/api/backtest.py` – `POST /api/backtest` Endpunkt
 
 ### Phase 5 – Frontend
 - [ ] Vite + React + TypeScript scaffolden
@@ -133,3 +190,4 @@ Test-Ergebnis (ohne Finnhub/SimFin/Marketaux-Keys, nur yfinance + AV):
 | Optionsschein-Stammdaten | Kein Free-API → ISIN + KO manuell eintragen |
 | Historisches Sentiment | Für Backtesting: neutral 12,5/25 |
 | DAX-Ticker mit .DE-Suffix | Sonderbehandlung in yfinance erforderlich |
+| Unrealized P&L | Warrant-Preis nicht via API verfügbar – muss manuell nachgetragen werden |

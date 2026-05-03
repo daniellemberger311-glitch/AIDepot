@@ -413,3 +413,34 @@ def get_universe_stats(db: Session) -> dict:
             stats[source] = stats.get(source, 0) + 1
     stats["total"] = sum(v for k, v in stats.items() if k != "total")
     return stats
+
+
+def refresh_universe(db: Session) -> dict:
+    """
+    Universum aktualisieren: Wikipedia-Listen + optionaler AV-Listing-Refresh.
+    Gibt Zusammenfassung zurück: {added, updated, total_active}.
+    """
+    before = db.query(Stock).filter(Stock.is_active == 1).count()
+
+    added = 0
+    try:
+        added += load_from_wikipedia(db)
+        logger.info("Wikipedia-Refresh: %d Ticker verarbeitet", added)
+    except Exception as exc:
+        logger.warning("Wikipedia-Refresh fehlgeschlagen: %s", exc)
+
+    # AV-Listing nur wenn Key vorhanden (kostet 1 Credit)
+    try:
+        from backend.config import settings
+        if settings.alpha_vantage_api_key:
+            av_added = load_from_av_listing(db, settings.alpha_vantage_api_key)
+            logger.info("AV-Listing-Refresh: %d Ticker verarbeitet", av_added)
+    except Exception as exc:
+        logger.warning("AV-Listing-Refresh fehlgeschlagen: %s", exc)
+
+    after = db.query(Stock).filter(Stock.is_active == 1).count()
+    return {
+        "added":        max(0, after - before),
+        "updated":      added,
+        "total_active": after,
+    }
