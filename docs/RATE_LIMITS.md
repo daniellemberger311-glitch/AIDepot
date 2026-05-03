@@ -1,95 +1,155 @@
 # Rate-Limit-Strategie
 
-## Das Problem
+## Überblick: Limits aller Datenquellen
 
-~850 Aktien täglich mit kostenlosen APIs scannen. Die harten Grenzen:
+| Quelle | Limit | Schutz implementiert |
+|--------|-------|----------------------|
+| yfinance | kein offizielles Limit | ✅ 4h-Cache |
+| StockTwits | inoffiziell, ~1 Req/2s | ✅ 2s-Sleep zwischen Calls |
+| ApeWisdom | kein Limit | ✅ 1h-Cache |
+| Finnhub | **60 Calls/Minute** | ✅ 1s-Sleep + 1h-Cache |
+| **Alpha Vantage** | **5 Calls/Minute + 25/Tag** | ✅ 13s-Mindestabstand + Tageszähler |
+| Marketaux | 100 News/Tag | ✅ Tageszähler in DB |
+| SimFin | kein Limit (privat) | ✅ 24h-Cache |
 
-| API | Limit | Tagesäquivalent |
-|-----|-------|-----------------|
-| Alpha Vantage | 25 Calls/Tag | 25 Ticker vollständig |
-| Finnhub | 60 Calls/Min | ~3.600/Stunde (wenn gleichmäßig verteilt) |
-| Marketaux | 100 News/Tag | ~100 Nachrichten |
-| yfinance | Unbegrenzt (inoffiziell) | Kein Limit |
-| StockTwits | Unbegrenzt (inoffiziell) | Kein Limit, aber freiwillig drosseln |
-| ApeWisdom | Unbegrenzt | Kein Limit |
-| SimFin | Unbegrenzt (privat) | Kein Limit |
+---
 
-## Lösung: Priorisierte Scan-Warteschlange
+## Alpha Vantage: BEIDE Limits gleichzeitig
 
-```
-Tier 0 (Pflicht, immer): Offene Positionen (~10–30 Aktien)
-    → Voller 3-Ebenen-Scan, alle APIs nutzen
-
-Tier 1 (Täglich): Zone-1-Aktien (~30–50 Aktien)
-    → Voller Scan täglich
-
-Tier 2 (Täglich): Zone-2-Aktien (~100 Aktien)
-    → Technisch + Sentiment (Fundamentals aus Cache wenn <3 Tage alt)
-
-Tier 3 (Täglich): Zone-3-Aktien (~200 Aktien)
-    → Nur Technik via yfinance + ta-Bibliothek (kein API-Quota)
-
-Tier 4 (Rotation): Zone-4-Rest (~550 Aktien)
-    → 200 Aktien/Tag rotierend → jede Aktie alle ~3 Tage
-    → Rotation-Index in configuration-Tabelle gespeichert
-```
-
-## Alpha-Vantage-Budget (25 Calls/Tag)
+Das ist die kritischste Datenquelle, weil **zwei unabhängige Limits** gleichzeitig gelten:
 
 ```
-10 Calls → Tier 0 (offene Positionen, technische Indikatoren)
-10 Calls → Top-10 Zone-1-Aktien nach Δ7T
- 5 Calls → Reserve für manuelle UI-Anfragen
+Täglich:    max. 25 Calls/Tag
+Pro Minute: max. 5 Calls/Minute → 1 Call alle 12 Sekunden
 ```
 
-**Wichtig:** Alpha Vantage wird nur als Ergänzung genutzt. Der technische Score
-wird primär mit der `ta`-Bibliothek auf yfinance-OHLCV-Daten berechnet – diese
-Kombination ist unbegrenzt nutzbar.
+### Wie es implementiert ist
 
-## Fallback-Kette
+**Modul-globaler Timestamp** (`_last_av_call_ts` in `alphavantage_fetcher.py`):
+- Vor jedem echten API-Call wird `_enforce_rate_limit()` aufgerufen
+- Diese Funktion wartet, bis seit dem letzten Call mind. 13 Sekunden vergangen sind
+- 13 s statt 12 s = 1 Sekunde Puffer gegen Netz-Jitter
+- Der Timestamp ist **prozessglobal** – verhindert Überläufe auch wenn mehrere
+  Ticker schnell hintereinander gescannt werden
 
-| Datentyp | Primär | Fallback 1 | Fallback 2 |
-|----------|--------|-----------|-----------|
-| Technische Indikatoren | `ta` + yfinance | Alpha Vantage | — |
-| News-Sentiment | Finnhub | Marketaux | Alpha Vantage |
-| Fundamentaldaten | SimFin | yfinance | — |
-| Insider-Transaktionen | Finnhub | yfinance | — |
-| Earnings-Kalender | yfinance | Finnhub | — |
+**Tageszähler in DB** (`configuration`-Tabelle):
+- Jeder erfolgreiche AV-Call erhöht `av_calls_today` um 1
+- Täglich um 00:01 UTC wird der Zähler durch `quota_reset_job` auf 0 zurückgesetzt
+- Wenn `av_calls_today >= 25` → kein weiterer Call, stattdessen Fallback
 
-## Cache-TTLs
+**Was Alpha Vantage zurückgibt wenn Rate-Limit überschritten:**
+```json
+{"Note": "Thank you for using Alpha Vantage! Our standard API call frequency is 5 calls per minute..."}
+```
+→ Der Fetcher erkennt diesen `"Note"`-Key und gibt `{}` zurück (kein Absturz).
+
+### Budget-Aufteilung (25 Calls/Tag)
+
+| Verwendung | Calls/Tag | Wann |
+|------------|-----------|------|
+| Zone-1-Aktien RSI/MACD | max. 10 | Scan 06:00 UTC |
+| Gehaltene Positionen | max. 5 | Scan 06:00 UTC |
+| Manuelle Refresh-Anfragen via UI | max. 5 | Jederzeit |
+| Reserve/Puffer | 5 | – |
+
+**Konsequenz:** Alpha Vantage ist NUR für die Top-15 Aktien des Tages.
+Für alle anderen Aktien (Zone 3+4) werden RSI, MACD und Bollinger lokal mit
+der `ta`-Bibliothek auf Basis von yfinance-OHLCV berechnet – **kein Limit,
+keine Kosten**.
+
+---
+
+## Scan-Strategie: Welche API bekommt welchen Tier?
+
+### Tier-Übersicht
+
+```
+Tier 0  gehaltene Positionen (~5–20 Aktien)
+        → ALLE APIs: yfinance + ta + Finnhub + AV + StockTwits + SimFin
+
+Tier 1  Zone 1+2 (~150 Aktien)
+        → yfinance + ta + Finnhub + StockTwits + ApeWisdom
+        → Alpha Vantage: nur Top 10 nach Δ7T (Budget-Schonung)
+        → SimFin: falls AV-Budget verbraucht
+
+Tier 2  Zone 3 (~200 Aktien)
+        → yfinance + ta + StockTwits + ApeWisdom
+        → KEINE Quota-APIs (Finnhub, AV, Marketaux, SimFin)
+        → Fundamentals: yfinance (kostenlos)
+
+Tier 3  Zone 4 (~500+ Aktien, täglich 200 rotierend)
+        → Nur yfinance + ta-Bibliothek
+        → Scan: 200 Aktien/Tag → gesamte Zone 4 alle ~2–3 Tage vollständig
+        → KEINE weiteren APIs
+```
+
+### Scan-Frequenz für das gesamte Universum (~850 Aktien)
+
+| Tier | Anzahl | Tägliche Scans | Vollständiger Zyklus |
+|------|--------|----------------|----------------------|
+| 0 (Positionen) | ~10–20 | täglich | täglich |
+| 1 (Zone 1+2) | ~150 | täglich | täglich |
+| 2 (Zone 3) | ~200 | täglich | täglich |
+| 3 (Zone 4) | ~500 | 200/Tag | alle 2–3 Tage |
+
+**→ Jede Aktie wird mindestens alle 3 Tage gescannt** (weit besser als wöchentlich).
+
+### Zeitbedarf für den täglichen Scan
+
+```
+yfinance (Tier 0–2, ~350 Aktien):    ~5 Min  (kein Sleep nötig)
+Finnhub (Tier 0–1, ~170 Aktien):     ~3 Min  (1s Sleep = 60/Min einhalten)
+StockTwits (Tier 0–2, ~350 Aktien):  ~12 Min (2s Sleep je Ticker)
+Alpha Vantage (max. 15 Aktien):      ~3 Min  (13s Sleep je Ticker)
+Zone 4 yfinance-Rotation (200):      ~3 Min
+
+Gesamt geschätzt: ~25–30 Minuten für den kompletten Tages-Scan
+```
+
+---
+
+## Finnhub (60 Calls/Minute)
+
+```python
+# In finnhub_fetcher.py: nach jedem Call
+time.sleep(1.1)  # 60 Calls/Min → 1 Call/Sek mit 10% Puffer
+```
+
+Bei ~170 Aktien (Tier 0+1) mit je 1 Finnhub-Call: **~3 Minuten**.
+
+---
+
+## Marketaux (100 News/Tag)
+
+Marketaux liefert News-Artikel, nicht einzelne Ticker-Calls.
+Mit `limit=3` pro Request decken 33 Requests = 33 Ticker ab.
+**Strategie:** Nur für Zone 1 einsetzen (max. 50 Ticker), Rest mit Finnhub oder ApeWisdom.
+
+---
+
+## Cache-TTLs im Überblick
 
 | Datentyp | TTL | Begründung |
-|----------|-----|------------|
-| OHLCV-Kursdaten | 4 Stunden | Für täglichen Scan ausreichend |
-| Fundamentaldaten (KGV, FCF) | 24 Stunden | Ändert sich höchstens quartalsweise |
-| News-Sentiment | 2 Stunden | Zeit-sensitiv, aber nicht minütlich |
-| StockTwits Bullish-Ratio | 1 Stunde | Intraday-Stimmung |
-| Earnings-Kalender | 24 Stunden | Termine ändern sich selten |
-| Analysten-Ratings | 24 Stunden | Täglich ausreichend |
+|----------|-----|-----------|
+| OHLCV (yfinance) | 4h | Intraday irrelevant für Tages-Scan |
+| Fundamentals (yfinance/SimFin) | 24h | Ändert sich quartalsweise |
+| Earnings-Kalender | 24h | Termin ändert sich selten |
+| News-Sentiment | 2h | Zeitkritischer als Fundamentals |
+| StockTwits Bullish-Ratio | 1h | Stündliche Veränderungen relevant |
+| Alpha-Vantage RSI/MACD | 4h | Tages-Indikator |
+| ApeWisdom Mentions | 1h | Reddit-Dynamik |
+| AV LISTING_STATUS | 7 Tage | Ändert sich kaum |
+| Wikipedia-Listen | 7 Tage | Quartalsweise Index-Änderungen |
 
-## Cache-Implementierung
+---
 
-Zweistufig:
-1. **In-Memory Dict** (`backend/cache/store.py`): Blitzschnell, überlebt innerhalb eines Scans
-2. **SQLite `api_cache`-Tabelle**: Persistiert über Neustarts, wird bei jedem Fetch zuerst geprüft
+## Notfallplan: API-Ausfall
 
-Cache-Key-Format: `"{source}:{data_type}:{ticker}"`  
-Beispiele: `"finnhub:sentiment:AAPL"`, `"yfinance:ohlcv:NVDA"`, `"stocktwits:ratio:TSLA"`
-
-## Tagesablauf des Scans (06:00 UTC)
-
-```
-06:00:00  Scan startet
-06:00:10  StockTwits Trending → Universe updaten
-06:00:30  Prioritätswarteschlange bauen
-06:01:00  Tier 0 scannen (Positionen, ~5 Min)
-06:06:00  Tier 1 scannen (Zone 1, ~15 Min)
-06:21:00  Tier 2 scannen (Zone 2, ~20 Min)
-06:41:00  Tier 3 scannen (Zone 3, ~25 Min, nur yfinance)
-07:06:00  Tier 4 scannen (Zone 4 Rotation, ~30 Min, nur yfinance)
-07:36:00  Portfolio-Monitor läuft
-07:40:00  Telegram-Benachrichtigungen senden
-07:45:00  Scan abgeschlossen, Status in configuration speichern
-```
-
-Gesamtdauer: ca. 1:45 Stunden. Zu 06:00 UTC = 08:00 CEST, rechtzeitig für die US-Börseneröffnung.
+| Quelle fällt aus | Fallback |
+|-----------------|---------|
+| Alpha Vantage | RSI/MACD aus `ta`-Bibliothek + yfinance (kein Score-Verlust) |
+| Finnhub Sentiment | Marketaux oder ApeWisdom + StockTwits |
+| SimFin | yfinance Fundamentals (etwas ungenauer) |
+| Marketaux | Finnhub News-Sentiment |
+| StockTwits | Sentiment-Score = neutral (12,5/25) |
+| yfinance | App pausiert – keine Alternative (unverzichtbar) |

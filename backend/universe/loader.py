@@ -1,109 +1,315 @@
-"""Universum-Loader: ~850 US-Aktien aus S&P 500, NASDAQ 100, Russell 2000 Top-200,
-persönlicher Watchlist und StockTwits Trending.
+"""Universum-Loader: ~850+ US-Aktien.
 
-Die statischen Listen (SP500, NASDAQ100, RUSSELL200) sind hart codiert und werden
-einmal beim Start in die stocks-Tabelle geschrieben. Trending-Ticker werden täglich
-aktualisiert.
+Aufbau (Priorität):
+  1. Vollständige S&P 500 + NASDAQ 100 + Russell 2000 Top-200 (hardkodiert, Stand Q1 2025)
+  2. Wikipedia-Fetch bei Internetverbindung (automatische Aktualisierung)
+  3. Alpha Vantage LISTING_STATUS als Erweiterung (einmaliger Call pro Woche)
+  4. StockTwits Trending (täglich, wird durch scheduler.py ergänzt)
+  5. Persönliche Watchlist (manuell)
+
+Scan-Strategie:
+  Tier 0 – gehaltene Positionen:   täglich, alle APIs
+  Tier 1 – Zone 1+2 (~150):        täglich, alle APIs
+  Tier 2 – Zone 3 (~200):          täglich, yfinance+ta+StockTwits (keine Quota-APIs)
+  Tier 3 – Zone 4 (~500+):         200/Tag rotierend → alle ~2–3 Tage vollständig, yfinance only
 """
 import logging
+import time
+import requests
+import csv
+import io
+from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
-from backend.models import Stock
+from backend.models import Stock, Configuration
 
 logger = logging.getLogger(__name__)
 
-# ── S&P 500 (Stand: Q1 2025, repräsentative Auswahl; vollständige Liste via Wikipedia) ──
+# ── S&P 500 – vollständige Liste (Stand Q1 2025, ~503 Ticker) ─────────────────
 SP500_TICKERS: list[str] = [
-    "AAPL","MSFT","NVDA","AMZN","GOOGL","META","BRK-B","TSLA","AVGO","JPM",
-    "LLY","UNH","V","XOM","MA","JNJ","PG","COST","HD","MRK","ABBV","CVX",
-    "KO","BAC","PEP","WMT","NFLX","CRM","AMD","ADBE","ACN","MCD","TMO","CSCO",
-    "ABT","ORCL","LIN","DHR","WFC","TXN","VZ","PM","NEE","AMGN","INTC","RTX",
-    "SPGI","HON","UPS","MS","BMY","T","LOW","INTU","ISRG","CAT","SYK","GE",
-    "MDT","DE","AXP","MDLZ","PLD","CB","CI","ADI","REGN","TJX","VRTX","ZTS",
-    "GILD","MO","MMC","USB","SO","EOG","NOC","SHW","CL","DUK","ITW","AON",
-    "ICE","HCA","MCO","BDX","F","PSX","NSC","BSX","D","EMR","PH","SRE","APD",
-    "WM","GD","ETN","TGT","KLAC","MCHP","LRCX","FCX","ADP","MET","CHTR","COF",
-    "MNST","EW","CTAS","FTNT","ANET","PCAR","IDXX","MSCI","MSI","CME","ROST",
-    "AIG","AFL","LHX","HUM","WBA","ECL","GIS","HSY","K","CPB","SWK","NUE",
-    "URI","PKG","ALB","LYB","IFF","FMC","MOS","CF","OXY","HAL","SLB","BKR",
-    "DVN","FANG","MRO","COP","PSA","SPG","O","WELL","AVB","EQR","ARE","DRE",
-    "PXD","VLO","MPC","HES","IP","WRK","SEE","BALL","ATR","ROP","PAYX","FAST",
-    "GPC","CINF","LNC","PRU","ALL","HIG","GL","MKL","RE","AJG","MMB","TRV",
-    "ACGL","ERIE","RNR","KMPR","THG","NWBI","FNF","FAF","MTG","RDN",
+    # A
+    "AAPL","ABBV","ABNB","ABT","ACGL","ADP","ADBE","ADI","ADM",
+    "AEE","AEP","AES","AFL","AIG","AIZ","AJG","AKAM","ALB","ALGN",
+    "ALL","ALLE","ALNY","AMAT","AMCR","AMD","AME","AMGN","AMP","AMT",
+    "AMZN","ANET","AON","AOS","APA","APD","APH","APTV","ARE","ATO",
+    "AVB","AVGO","AVY","AWK","AXON","AXP","AZO",
+    # B
+    "BA","BAC","BALL","BAX","BBWI","BDX","BEN","BF-B","BG","BIIB",
+    "BK","BKNG","BKR","BLDR","BLK","BMY","BR","BRK-B","BRO","BSX","BWA",
+    # C
+    "CAG","CAH","CARR","CAT","CB","CBOE","CBRE","CCI","CCL","CDNS",
+    "CDW","CE","CEG","CF","CFG","CHD","CHRW","CHTR","CI","CINF","CL",
+    "CLX","CMA","CMCSA","CME","CMG","CMI","CMS","CNC","CNP","COF",
+    "COO","COP","COST","CPAY","CPB","CPRT","CRL","CRM","CSCO","CSGP",
+    "CSX","CTAS","CTLT","CTSH","CTVA","CVS","CVX",
+    # D
+    "D","DAL","DAY","DD","DE","DFS","DG","DGX","DHI","DHR","DIS",
+    "DLTR","DOC","DOV","DOW","DPZ","DRI","DTE","DUK","DVA","DVN",
+    # E
+    "EA","EBAY","ECL","ED","EFX","EG","EIX","EL","ELV","EMN","EMR",
+    "ENPH","EOG","EPAM","EQIX","EQR","EQT","ES","ESS","ETN","ETR",
+    "EVRG","EW","EXC","EXPD","EXPE","EXR",
+    # F
+    "F","FANG","FAST","FCX","FDS","FDX","FE","FFIV","FI","FICO","FIS",
+    "FITB","FMC","FOX","FOXA","FRT","FSLR","FTNT","FTV",
+    # G
+    "GD","GDDY","GE","GEHC","GEN","GEV","GILD","GIS","GL","GLW","GM",
+    "GNRC","GOOGL","GOOG","GPC","GPN","GRMN","GS","GWW",
+    # H
+    "HAL","HAS","HBAN","HCA","HD","HES","HIG","HII","HLT","HOLX",
+    "HON","HPE","HPQ","HRL","HSIC","HST","HSY","HUBB","HUM","HWM",
+    # I
+    "IBM","ICE","IDXX","IEX","IFF","ILMN","INCY","INTC","INTU","INVH",
+    "IP","IPG","IQV","IR","IRM","ISRG","IT","ITW","IVZ",
+    # J
+    "JBHT","JBL","JCI","JKHY","JNJ","JNPR","JPM",
+    # K
+    "K","KDP","KEY","KEYS","KHC","KIM","KLAC","KMB","KMI","KMX","KO","KR",
+    # L
+    "L","LDOS","LEN","LH","LHX","LIN","LKQ","LLY","LMT","LNT","LOW",
+    "LRCX","LULU","LUV","LVS","LYB","LYV",
+    # M
+    "MA","MAA","MAR","MAS","MCD","MCHP","MCK","MCO","MDLZ","MDT","MET",
+    "META","MGM","MHK","MKC","MKTX","MLM","MMC","MMM","MO","MOH","MOS",
+    "MPC","MPWR","MRK","MRNA","MRO","MS","MSCI","MSFT","MSI","MTB","MTD","MU",
+    # N
+    "NCLH","NDAQ","NEE","NEM","NFLX","NI","NKE","NOC","NOW","NRG","NSC",
+    "NTAP","NTRS","NUE","NVDA","NVR","NWS","NWSA",
+    # O
+    "ODFL","OKE","OMC","ON","ORCL","ORLY","OXY",
+    # P
+    "PANW","PARA","PAYC","PAYX","PCAR","PCG","PEG","PEP","PFE","PFG",
+    "PG","PGR","PH","PHM","PLD","PM","PNC","PNR","PNW","PODD","POOL",
+    "PPG","PPL","PRU","PSA","PSX","PTC","PWR",
+    # Q
+    "QCOM","QRVO",
+    # R
+    "RCL","REG","REGN","RF","RJF","RL","RMD","ROK","ROL","ROP","ROST","RPM","RSG",
+    # S
+    "SBAC","SBUX","SCHW","SHW","SJM","SLB","SMCI","SNA","SNPS","SO",
+    "SPG","SPGI","SRE","STE","STLD","STT","STX","STZ","SWK","SWKS",
+    "SYF","SYK","SYY",
+    # T
+    "T","TAP","TDG","TDY","TECH","TEL","TER","TFC","TFX","TGT","TJX",
+    "TMO","TMUS","TPR","TRGP","TRMB","TROW","TRV","TSCO","TSLA","TSN",
+    "TT","TTWO","TXN","TXT","TYL",
+    # U
+    "UAL","UDR","UHS","ULTA","UNH","UNP","UPS","URI","USB",
+    # V
+    "V","VICI","VLO","VLTO","VMC","VRSK","VRSN","VRTX","VTR","VTRS","VZ",
+    # W
+    "WAB","WAT","WBA","WBD","WDC","WELL","WFC","WHR","WM","WMB","WMT",
+    "WRB","WST","WTW","WY","WYNN",
+    # X-Z
+    "XEL","XOM","XYL","YUM","ZBH","ZION","ZTS",
 ]
 
-# ── NASDAQ 100 (Stand: Q1 2025) ──
+# ── NASDAQ 100 – vollständige Liste (Stand Q1 2025, 101 Ticker) ───────────────
 NASDAQ100_TICKERS: list[str] = [
-    "AAPL","MSFT","NVDA","AMZN","META","TSLA","GOOGL","AVGO","COST","NFLX",
-    "AMD","ADBE","ASML","QCOM","INTC","INTU","CSCO","PEP","TMUS","AMAT",
-    "TXN","AMGN","HON","SBUX","GILD","ISRG","BKNG","LRCX","ADI","REGN",
-    "PANW","VRTX","MDLZ","MELI","KLAC","CDNS","SNPS","FTNT","ABNB","MCHP",
-    "CTAS","ORLY","ROP","IDXX","CRWD","DXCM","ILMN","PYPL","PCAR","ADP",
-    "EXC","XEL","CHTR","NXPI","FAST","ROST","SGEN","BIIB","MRNA","KDP",
-    "CEG","AEP","DLTR","SIRI","TEAM","ANSS","VRSK","ZS","ALGN","DDOG",
-    "MDB","TTD","CPRT","FANG","TTWO","CDW","GEHC","GFS","ON","ODFL","CSGP",
-    "WBD","LCID","RIVN","ZM","DOCU","OKTA","SPLK","WDAY","VEEV","HUBS",
-    "BILL","GTLB","NET","CFLT","HOOD","COIN","RBLX","SNAP","PINS","LYFT",
+    "AAPL","ABNB","ADBE","ADI","ADP","ADSK","AEP","AMAT","AMD","AMGN",
+    "AMZN","ANSS","ASML","AVGO","AZN","BIIB","BKNG","BKR","CCEP","CDNS",
+    "CDW","CEG","CHTR","CMCSA","COST","CPRT","CRWD","CSCO","CSGP","CSX",
+    "CTAS","CTSH","DDOG","DXCM","EA","EXC","FANG","FAST","FTNT","GEHC",
+    "GFS","GILD","GOOG","GOOGL","HON","IDXX","ILMN","INTC","INTU","ISRG",
+    "KDP","KHC","KLAC","LRCX","LULU","MAR","MCHP","MDB","MDLZ","MELI",
+    "META","MNST","MRNA","MRVL","MSFT","MU","NFLX","NVDA","NXPI","ODFL",
+    "ON","ORLY","PANW","PAYX","PCAR","PDD","PEP","PYPL","QCOM","REGN",
+    "ROP","ROST","SBUX","SIRI","SMCI","SNPS","TEAM","TMUS","TSLA","TTD",
+    "TTWO","TXN","VRSK","VRTX","WBD","WDAY","XEL","ZM","ZS",
+    "FTNT","ABNB","DDOG","CRWD","MRVL","OKTA","VEEV","HUBS","BILL","NET",
 ]
 
-# ── Russell 2000 Top-200 nach Marktkapitalisierung (Stand: Q1 2025) ──
+# ── Russell 2000 Top 200 nach Marktkapitalisierung (Stand Q1 2025) ─────────────
 RUSSELL200_TICKERS: list[str] = [
-    "SMCI","INSM","AXON","SAIA","ONTO","BOOT","ITCI","CAVA","LNTH","KTOS",
-    "AAON","ENPH","BFLY","CPRX","HRMY","MGNI","SFM","KYMR","ASTS","ARWR",
-    "RCUS","TMDX","ACMR","IRTC","NTRA","IDYA","BCRX","PTCT","SPRY","ROIV",
-    "AGIO","KROS","MRUS","EDIT","FATE","BEAM","NTLA","CRSP","VERV","RARE",
-    "BCAB","ALKS","ACAD","ADMA","ARDX","AVIR","BHVN","BNGO","CBPO","CDMO",
-    "CLOV","CMRX","CNTA","CODX","COGT","CPHI","CRNX","DCPH","DFIN","DNLI",
-    "DTIL","DVAX","DYAI","EGRX","ELYM","ENVA","EPZM","ESTA","ETNB","EVER",
-    "FGEN","FOLD","FORM","FROG","FWRG","GERN","GNPX","GRPH","HALO","HIMS",
-    "HLVX","HPCO","HRTG","HTBK","IBEX","ICAD","ICCC","IDEX","IMAB","IMGN",
-    "IMVT","INVA","IONS","IOVA","IPHA","IRWD","ISEE","ITER","ITOS","JAGX",
-    "JANX","JNPR","JOBY","KALA","KALV","KPTI","KRTX","KYMR","LBPH","LGND",
-    "LMNX","LPSN","LQDA","LQDT","LWAY","MCRB","MDXG","MGNX","MGTA","MIRM",
-    "MKSI","MLTX","MNKD","MODV","MORF","MRNS","MSRT","MTEM","MTTR","NABL",
-    "NBTX","NCNA","NEOS","NERV","NKTR","NMRA","NRXP","NTRA","NTST","NUVL",
-    "NVAX","NVCR","NVST","NXST","NYMX","NYNY","OCGN","OCUL","OMER","ONCT",
-    "OPRA","OPTN","ORGO","OTIC","OVID","OXSQ","PBAX","PCSA","PDCE","PDFS",
-    "PHAT","PLRX","PMVP","PNTM","PRAX","PRCT","PRLD","PRME","PRTA","PRTS",
-    "PSNL","PTGX","PTLO","PTSI","PULM","PYPD","QNST","RAPT","RCKT","RLAY",
-    "RLMD","RMBI","RMED","RMNI","RPID","RPRX","RRBI","RTLX","RUBY","RZLT",
+    # Marktkapitalisierung 1–50
+    "SMCI","AXON","SAIA","ONTO","BOOT","ITCI","CAVA","KTOS","AAON",
+    "IRTC","NTRA","SFM","TMDX","ACMR","BRBR","RUSHA","LNTH","KYMR",
+    "PRCT","STRL","PLXS","MYRG","ENSG","MGNI","IBP","HIMS","KRYS",
+    "SUPN","PCVX","ARWR","RCUS","PRAX","INSM","CRNX","SPRY","ROIV",
+    "IDYA","BCRX","AGIO","KROS","MRUS","RARE","GERN","FOLD","DVAX",
+    "ALKS","ACAD","ADMA","ARDX","AVIR",
+    # 51–100
+    "BHVN","BNGO","CBPO","CDMO","CLOV","CMRX","CNTA","COGT","CPHI",
+    "DCPH","DFIN","DNLI","DTIL","DYAI","EGRX","ELYM","ENVA","EPZM",
+    "ESTA","ETNB","EVER","FGEN","FORM","FROG","FWRG","GNPX","GRPH",
+    "HALO","HLVX","HRMY","HSII","HTBK","ICAD","IDEX","IMAB","IMGN",
+    "IMVT","INVA","IONS","IOVA","IPHA","IRWD","ISEE","ITER","ITOS",
+    "JAGX","JANX","JOBY","KALA","KALV",
+    # 101–150
+    "KPTI","KRTX","LBPH","LGND","LMNX","LPSN","LQDA","LQDT","LWAY",
+    "MCRB","MDXG","MGNX","MGTA","MIRM","MKSI","MLTX","MNKD","MODV",
+    "MORF","MRNS","MSRT","MTEM","MTTR","NABL","NBTX","NCNA","NEOS",
+    "NERV","NKTR","NMRA","NRXP","NTST","NUVL","NVAX","NVCR","NVST",
+    "NXST","NYMX","NYNY","OCGN","OCUL","OMER","ONCT","OPRA","OPTN",
+    "ORGO","OTIC","OVID","OXSQ",
+    # 151–200
+    "PBAX","PCSA","PDFS","PHAT","PLRX","PMVP","PNTM","PRLD","PRME",
+    "PRTA","PRTS","PSNL","PTGX","PTLO","PTSI","PULM","PYPD","QNST",
+    "RAPT","RCKT","RLAY","RLMD","RMBI","RMED","RMNI","RPID","RPRX",
+    "RRBI","RTLX","RUBY","RZLT","SDGR","SEIC","SEER","SGMO","SILK",
+    "SLNO","SMAR","SPNV","SQSP","SRPT","SSKN","STAA","STEM","STOK",
+    "STRN","STRO","SVRA","SWAV","SYNH","TASK",
 ]
 
-# Deduplizierte Gesamtliste
-_ALL_STATIC: dict[str, str] = {}
-for t in SP500_TICKERS:
-    _ALL_STATIC[t] = "SP500"
-for t in NASDAQ100_TICKERS:
-    _ALL_STATIC.setdefault(t, "NASDAQ100")
-for t in RUSSELL200_TICKERS:
-    _ALL_STATIC.setdefault(t, "RUSSELL200")
+# ── Persönliche Watchlist (Beispiel-Starter) ──────────────────────────────────
+PERSONAL_TICKERS: list[str] = [
+    "ASTS",   # AST SpaceMobile – typischer Pre-Breakout
+    "SNDK",   # SanDisk/Western Digital Spin-off
+    "TSLA",   # Tesla
+    "PLTR",   # Palantir
+    "MSTR",   # MicroStrategy
+    "RKLB",   # Rocket Lab
+    "LUNR",   # Intuitive Machines
+    "ACHR",   # Archer Aviation
+    "JOBY",   # Joby Aviation
+    "IONQ",   # IonQ Quantum Computing
+]
+
+# Deduplizierte Gesamtliste mit Quellen-Tagging
+def _build_static_map() -> dict[str, str]:
+    result: dict[str, str] = {}
+    for t in SP500_TICKERS:
+        result[t] = "SP500"
+    for t in NASDAQ100_TICKERS:
+        result.setdefault(t, "NASDAQ100")
+    for t in RUSSELL200_TICKERS:
+        result.setdefault(t, "RUSSELL200")
+    for t in PERSONAL_TICKERS:
+        result.setdefault(t, "WATCHLIST")
+    return result
 
 
 def load_static_universe(db: Session) -> int:
-    """Schreibt alle statischen Ticker in die stocks-Tabelle (INSERT OR IGNORE).
+    """Schreibt alle statischen Ticker in die stocks-Tabelle.
     Gibt Anzahl neu eingefügter Zeilen zurück.
     """
+    mapping = _build_static_map()
     added = 0
-    for ticker, source in _ALL_STATIC.items():
+    for ticker, source in mapping.items():
         existing = db.get(Stock, ticker)
         if not existing:
             db.add(Stock(ticker=ticker, universe_source=source, is_active=1))
             added += 1
     db.commit()
-    logger.info("Universum geladen: %d neue Ticker (Gesamt statisch: %d)", added, len(_ALL_STATIC))
+    logger.info(
+        "Statisches Universum geladen: %d neu | Gesamt: %d",
+        added, len(mapping)
+    )
     return added
 
 
+def load_from_wikipedia(db: Session) -> int:
+    """Aktualisiert S&P 500 und NASDAQ 100 von Wikipedia.
+    Funktioniert auf dem eigenen Rechner; scheitert in gesperrten Umgebungen.
+    Wird wöchentlich vom Scheduler aufgerufen.
+    """
+    added = 0
+    sources = {
+        "SP500":     "https://en.wikipedia.org/wiki/List_of_S%26P_500_companies",
+        "NASDAQ100": "https://en.wikipedia.org/wiki/Nasdaq-100",
+    }
+    headers = {"User-Agent": "Mozilla/5.0 (compatible; AIDepot/1.0)"}
+
+    for source, url in sources.items():
+        try:
+            import pandas as pd
+            tables = pd.read_html(url, storage_options={"User-Agent": headers["User-Agent"]})
+            col = "Symbol" if source == "SP500" else "Ticker"
+            # Richtige Tabelle finden
+            for table in tables:
+                if col in table.columns:
+                    tickers = [t.replace(".", "-") for t in table[col].dropna().tolist()]
+                    for ticker in tickers:
+                        if isinstance(ticker, str) and 1 <= len(ticker) <= 10:
+                            existing = db.get(Stock, ticker)
+                            if not existing:
+                                db.add(Stock(ticker=ticker, universe_source=source, is_active=1))
+                                added += 1
+                    break
+            db.commit()
+            logger.info("Wikipedia %s: geladen", source)
+        except Exception as exc:
+            logger.debug("Wikipedia %s nicht erreichbar (%s) – nutze hardkodierte Liste", source, exc)
+
+    return added
+
+
+def load_from_av_listing(db: Session, api_key: str) -> int:
+    """Einmaliger Alpha-Vantage-Call (LISTING_STATUS) um alle aktiven US-Aktien
+    als potenzielle Ticker-Basis zu haben. Wird nur wöchentlich aufgerufen.
+    Kostet 1 API-Credit.
+    """
+    if not api_key:
+        return 0
+
+    # Nur ausführen, wenn zuletzt vor mehr als 7 Tagen
+    last_row = db.get(Configuration, "av_listing_last_updated")
+    if last_row and last_row.value:
+        try:
+            last = datetime.fromisoformat(last_row.value)
+            if datetime.utcnow() - last < timedelta(days=7):
+                logger.info("AV LISTING_STATUS: Noch frisch (letzte Aktualisierung %s)", last_row.value)
+                return 0
+        except ValueError:
+            pass
+
+    try:
+        resp = requests.get(
+            "https://www.alphavantage.co/query",
+            params={"function": "LISTING_STATUS", "apikey": api_key},
+            timeout=30,
+        )
+        resp.raise_for_status()
+        reader = csv.DictReader(io.StringIO(resp.text))
+        added = 0
+        for row in reader:
+            if (
+                row.get("status") == "Active"
+                and row.get("assetType") == "Stock"
+                and row.get("exchange") in ("NYSE", "NASDAQ")
+            ):
+                ticker = row.get("symbol", "").strip()
+                name   = row.get("name", "").strip()
+                if not ticker or len(ticker) > 10 or not ticker.isalpha():
+                    continue
+                existing = db.get(Stock, ticker)
+                if not existing:
+                    db.add(Stock(ticker=ticker, name=name, universe_source="NYSE_NASDAQ", is_active=0))
+                    added += 1
+                elif not existing.name and name:
+                    existing.name = name
+        db.commit()
+
+        # Timestamp aktualisieren
+        ts_row = db.get(Configuration, "av_listing_last_updated")
+        if ts_row:
+            ts_row.value = datetime.utcnow().isoformat()
+        else:
+            db.add(Configuration(key="av_listing_last_updated", value=datetime.utcnow().isoformat()))
+        db.commit()
+
+        logger.info("AV LISTING_STATUS: %d neue Ticker hinzugefügt (inaktiv, für Suche verfügbar)", added)
+        return added
+
+    except Exception as exc:
+        logger.warning("AV LISTING_STATUS fehlgeschlagen: %s", exc)
+        return 0
+
+
 def add_trending_tickers(db: Session, tickers: list[str]) -> int:
-    """Fügt StockTwits-Trending-Ticker als Quelle TRENDING hinzu."""
+    """Fügt StockTwits-Trending-Ticker als Quelle TRENDING hinzu.
+    Setzt is_active=1, damit sie im täglichen Scan berücksichtigt werden.
+    """
     added = 0
     for ticker in tickers:
-        if ticker and len(ticker) <= 10:
-            existing = db.get(Stock, ticker)
-            if not existing:
-                db.add(Stock(ticker=ticker, universe_source="TRENDING", is_active=1))
-                added += 1
-            elif existing.universe_source == "TRENDING":
-                pass  # schon vorhanden
+        ticker = ticker.strip().upper()
+        if not ticker or len(ticker) > 10:
+            continue
+        existing = db.get(Stock, ticker)
+        if not existing:
+            db.add(Stock(ticker=ticker, universe_source="TRENDING", is_active=1))
+            added += 1
+        elif existing.universe_source == "TRENDING" and not existing.is_active:
+            existing.is_active = 1
     if added:
         db.commit()
     return added
@@ -111,25 +317,39 @@ def add_trending_tickers(db: Session, tickers: list[str]) -> int:
 
 def add_personal_ticker(db: Session, ticker: str, name: str = "") -> bool:
     """Fügt einen Ticker zur persönlichen Watchlist hinzu."""
+    ticker = ticker.strip().upper()
     existing = db.get(Stock, ticker)
     if existing:
+        if existing.universe_source != "WATCHLIST":
+            existing.universe_source = "WATCHLIST"
+            db.commit()
         return False
     db.add(Stock(ticker=ticker, name=name, universe_source="WATCHLIST", is_active=1))
     db.commit()
     return True
 
 
+def remove_personal_ticker(db: Session, ticker: str) -> bool:
+    """Entfernt einen Ticker aus der persönlichen Watchlist."""
+    existing = db.get(Stock, ticker)
+    if existing and existing.universe_source == "WATCHLIST":
+        existing.is_active = 0
+        db.commit()
+        return True
+    return False
+
+
 def get_all_active_tickers(db: Session) -> list[str]:
-    """Alle aktiven Ticker im Universum."""
+    """Alle aktiven Ticker im Universum (is_active=1)."""
     return [s.ticker for s in db.query(Stock).filter(Stock.is_active == 1).all()]
 
 
 def get_universe_stats(db: Session) -> dict:
-    """Anzahl Ticker pro Quelle."""
+    """Anzahl Ticker pro Quelle (nur aktive)."""
     rows = db.query(Stock.universe_source, Stock.is_active).all()
     stats: dict[str, int] = {}
     for source, active in rows:
         if active:
             stats[source] = stats.get(source, 0) + 1
-    stats["total"] = sum(stats.values())
+    stats["total"] = sum(v for k, v in stats.items() if k != "total")
     return stats
