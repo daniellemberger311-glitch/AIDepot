@@ -9,7 +9,7 @@ Ziel: Aktien im Pre-Breakout-Aufbau (VCP-Muster wie ASTS, SNDK, NVDA) frühzeiti
 
 ## Aktueller Entwicklungsstand
 
-**Phase 1 ✅ | Phase 2 ✅ | Phase 3 ✅ | Phase 4 ✅ abgeschlossen | Phase 5 – Frontend (als nächstes)**
+**Phase 1 ✅ | Phase 2 ✅ | Phase 3 ✅ | Phase 4 ✅ | Phase 5 ✅ abgeschlossen | Phase 6 – Produktion (als nächstes)**
 
 | Modul | Status |
 |-------|--------|
@@ -24,7 +24,7 @@ Ziel: Aktien im Pre-Breakout-Aufbau (VCP-Muster wie ASTS, SNDK, NVDA) frühzeiti
 | API-Endpunkte: 40 Routen (watchlist, signals, portfolio, dashboard, history, scan, config, universe, backtest) | ✅ fertig |
 | Scheduler (APScheduler 06:00 UTC) + Telegram-Bot | ✅ fertig |
 | Backtesting-Modul | ✅ fertig |
-| Frontend (React + Vite) | ⏳ offen – Phase 5 |
+| Frontend (React + Vite) | ✅ fertig – 7 Seiten |
 
 Detaillierter Fortschritt → `TODO.md`  
 Entwicklungs-Roadmap → `docs/ROADMAP.md`

@@ -6,9 +6,9 @@ Zuletzt aktualisiert: 2026-05-03
 
 ## Aktueller Stand
 
-**Phase:** 4 – Backtesting (Phase 3 abgeschlossen ✅)  
+**Phase:** 5 – Frontend (Phase 4 abgeschlossen ✅)  
 **Branch:** `main`  
-**Gesamtfortschritt:** ~75 %
+**Gesamtfortschritt:** ~95 %
 
 ---
 
@@ -72,16 +72,22 @@ Zuletzt aktualisiert: 2026-05-03
 
 ---
 
-## 📋 Phase 5 – Frontend (7 Seiten, als nächstes)
+## ✅ Phase 5 – Frontend (abgeschlossen)
 
-- [ ] Vite + React + TypeScript scaffolden (`frontend/`)
-- [ ] Dashboard (`/`) – P&L, Top-5 Zone 1, Exit-Warnungen
-- [ ] Watchlist (`/watchlist`) – 4-Zonen-Tabelle, sortiert nach Δ7T
-- [ ] Signal-Detail (`/signal/:ticker`) – Score-Aufschlüsselung, 30T-Chart, OS-Empfehlung
-- [ ] Portfolio (`/portfolio`) – Positionen, HALTEN/BEOBACHTEN/EXIT, Kauf/Verkauf
-- [ ] Trade-Historie (`/history`) – Archiv, P&L-Statistik, Trefferquote
-- [ ] Backtesting (`/backtest`) – Ticker + Zeitraum, Signal-Zeitstrahl
-- [ ] Konfiguration (`/config`) – 5 Tabs: Universum, API-Status, Gewichtungen, Scan, Alerts
+- [x] Vite + React + TypeScript scaffolden (`frontend/`)
+- [x] API-Client (`src/api/client.ts`) – alle 40 Endpunkte, Axios
+- [x] TypeScript-Typen (`src/types/api.ts`) – spiegeln backend/schemas.py
+- [x] Layout + Komponenten: Card, PageHeader, ZoneBadge, ScoreBar, DeltaBadge, SeverityBadge
+- [x] Dashboard (`/`) – 4 KPI-Karten, Top-5 Zone-1-Signale, Exit-Warnungen, Scan-Trigger
+- [x] Watchlist (`/watchlist`) – Zone-Tabs, sortierbare Tabelle (Score/Δ7T/Δ1T/Ticker)
+- [x] Signal-Detail (`/signal/:ticker`) – Score-Breakdown, 30T-Chart (Recharts), OS-Empfehlung, Rescan
+- [x] Portfolio (`/portfolio`) – CRUD Positionen, Schließen-Modal, Exit-Signal-Anzeige
+- [x] Trade-Historie (`/history`) – Archiv, Signalqualität, P&L-Zusammenfassung
+- [x] Backtesting (`/backtest`) – Kurs-/Score-Chart, Ereignistabelle, KPI-Karten
+- [x] Konfiguration (`/config`) – 5 Tabs: Universum, API-Status, Gewichtungen, Scan, Alerts
+
+**Stack:** Vite 6 + React 18 + TypeScript, TanStack Query v5, React Router DOM v6, Recharts, Tailwind CSS v4, lucide-react  
+**Start:** `cd frontend && npm run dev` → http://localhost:5173
 
 ---
 
