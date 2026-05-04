@@ -51,6 +51,20 @@ export default function Dashboard() {
         }
       />
 
+      {/* Scan-Fehler-Banner */}
+      {scanStatus?.error && (
+        <div className="mx-6 mt-4 flex items-start gap-3 p-3 bg-red-900/20 border border-red-700/40 rounded-xl">
+          <AlertTriangle className="w-4 h-4 text-red-400 flex-shrink-0 mt-0.5" />
+          <div className="text-sm">
+            <span className="font-medium text-red-300">Letzter Scan fehlgeschlagen: </span>
+            <span className="text-red-400">{scanStatus.error}</span>
+            {scanStatus.tickers_failed.length > 0 && (
+              <span className="text-red-600 ml-1">({scanStatus.tickers_failed.length} Ticker fehlgeschlagen)</span>
+            )}
+          </div>
+        </div>
+      )}
+
       <div className="p-6 space-y-6">
         {/* KPIs */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">

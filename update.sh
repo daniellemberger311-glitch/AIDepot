@@ -18,6 +18,9 @@ git pull origin main
 echo "--- Python: Pakete aktualisieren ---"
 .venv/bin/pip install -q -r backend/requirements.txt
 
+echo "--- Datenbank: Migrationen anwenden ---"
+.venv/bin/alembic upgrade head
+
 echo "--- Frontend: bauen ---"
 cd frontend
 npm install --silent
