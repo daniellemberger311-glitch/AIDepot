@@ -224,6 +224,21 @@ export interface ZoneSummary {
   zones: Record<number, number>
 }
 
+// Logs
+export interface LogEntry {
+  timestamp: string
+  level: 'DEBUG' | 'INFO' | 'WARNING' | 'ERROR' | 'CRITICAL'
+  logger: string
+  message: string
+}
+
+export interface LogResponse {
+  total_returned: number
+  error_count: number
+  warning_count: number
+  entries: LogEntry[]
+}
+
 // Backtesting
 export interface BacktestDataPoint {
   date: string
