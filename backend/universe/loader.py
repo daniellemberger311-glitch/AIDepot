@@ -429,6 +429,13 @@ def refresh_universe(db: Session) -> dict:
     except Exception as exc:
         logger.warning("Wikipedia-Refresh fehlgeschlagen: %s", exc)
 
+    # Fallback: statische Liste laden wenn Wikipedia nichts geliefert hat
+    current_active = db.query(Stock).filter(Stock.is_active == 1).count()
+    if current_active == 0:
+        static_added = load_static_universe(db)
+        added += static_added
+        logger.info("Fallback statisches Universum: %d Ticker geladen", static_added)
+
     # AV-Listing nur wenn Key vorhanden (kostet 1 Credit)
     try:
         from backend.config import settings
