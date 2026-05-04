@@ -1,15 +1,16 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { CheckCircle, XCircle, RefreshCw, Plus, Trash2 } from 'lucide-react'
+import { CheckCircle, XCircle, RefreshCw, Plus, Trash2, AlertTriangle, Info } from 'lucide-react'
 import {
   fetchConfig, updateConfig, fetchApiStatus, fetchScanSchedule,
   fetchUniverse, searchUniverse, addTicker, deactivateTicker, refreshUniverse,
+  fetchLogs, clearLogs,
 } from '../api/client'
-import type { AppConfig } from '../types/api'
+import type { AppConfig, LogEntry } from '../types/api'
 import Card from '../components/Card'
 import PageHeader from '../components/PageHeader'
 
-type Tab = 'universe' | 'api' | 'weights' | 'scan' | 'alerts'
+type Tab = 'universe' | 'api' | 'weights' | 'scan' | 'alerts' | 'logs'
 
 const TABS: { id: Tab; label: string }[] = [
   { id: 'universe', label: 'Universum' },
@@ -17,6 +18,7 @@ const TABS: { id: Tab; label: string }[] = [
   { id: 'weights', label: 'Gewichtungen' },
   { id: 'scan', label: 'Scan-Config' },
   { id: 'alerts', label: 'Alerts' },
+  { id: 'logs',    label: 'Logs' },
 ]
 
 // ── Universe Tab ─────────────────────────────────────────────────────────────
@@ -335,6 +337,151 @@ function AlertsTab() {
   )
 }
 
+// ── Logs Tab ──────────────────────────────────────────────────────────────────
+const LEVEL_COLORS: Record<string, string> = {
+  DEBUG:    'text-gray-500',
+  INFO:     'text-gray-300',
+  WARNING:  'text-yellow-400',
+  ERROR:    'text-red-400',
+  CRITICAL: 'text-red-300',
+}
+
+const LEVEL_BG: Record<string, string> = {
+  DEBUG:    '',
+  INFO:     '',
+  WARNING:  'bg-yellow-900/10',
+  ERROR:    'bg-red-900/15',
+  CRITICAL: 'bg-red-900/25',
+}
+
+function LogRow({ entry }: { entry: LogEntry }) {
+  const [expanded, setExpanded] = useState(false)
+  const isMultiline = entry.message.includes('\n')
+  const preview = isMultiline ? entry.message.split('\n')[0] : entry.message
+
+  return (
+    <div
+      className={`px-3 py-1.5 border-b border-gray-800/40 ${LEVEL_BG[entry.level] ?? ''} ${isMultiline ? 'cursor-pointer hover:bg-gray-800/20' : ''}`}
+      onClick={() => isMultiline && setExpanded(e => !e)}
+    >
+      <div className="flex items-start gap-3 min-w-0">
+        <span className="text-gray-600 font-mono text-xs flex-shrink-0 mt-0.5">
+          {entry.timestamp.slice(11, 19)}
+        </span>
+        <span className={`text-xs font-semibold w-14 flex-shrink-0 ${LEVEL_COLORS[entry.level]}`}>
+          {entry.level}
+        </span>
+        <span className="text-gray-600 text-xs w-36 flex-shrink-0 truncate hidden lg:block">
+          {entry.logger}
+        </span>
+        <span className={`text-xs font-mono flex-1 min-w-0 ${LEVEL_COLORS[entry.level]} ${expanded ? 'whitespace-pre-wrap break-all' : 'truncate'}`}>
+          {expanded ? entry.message : preview}
+          {isMultiline && !expanded && <span className="text-gray-600 ml-1">▸</span>}
+        </span>
+      </div>
+    </div>
+  )
+}
+
+function LogsTab() {
+  const qc = useQueryClient()
+  const [level, setLevel] = useState<string>('INFO')
+  const [module, setModule] = useState('')
+  const [autoRefresh, setAutoRefresh] = useState(false)
+
+  const { data, isLoading, dataUpdatedAt } = useQuery({
+    queryKey: ['logs', level, module],
+    queryFn: () => fetchLogs({ level: level || undefined, module: module || undefined, limit: 200 }),
+    refetchInterval: autoRefresh ? 5_000 : false,
+  })
+
+  const clear = useMutation({
+    mutationFn: clearLogs,
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['logs'] }),
+  })
+
+  const LEVELS = ['DEBUG', 'INFO', 'WARNING', 'ERROR']
+
+  return (
+    <div className="space-y-3">
+      {/* Toolbar */}
+      <div className="flex flex-wrap items-center gap-3">
+        {/* Level-Filter */}
+        <div className="flex gap-1">
+          {LEVELS.map(l => (
+            <button key={l} onClick={() => setLevel(l)}
+              className={`px-2.5 py-1 text-xs rounded font-medium transition-colors ${
+                level === l
+                  ? 'bg-emerald-600 text-white'
+                  : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+              }`}>
+              {l}
+            </button>
+          ))}
+        </div>
+
+        {/* Modul-Filter */}
+        <input
+          value={module} onChange={e => setModule(e.target.value)}
+          placeholder="Modul-Filter (z.B. scoring)"
+          className="bg-gray-800 border border-gray-700 rounded px-2.5 py-1 text-xs text-white focus:outline-none focus:border-emerald-500 w-44"
+        />
+
+        {/* Auto-Refresh */}
+        <label className="flex items-center gap-1.5 text-xs text-gray-400 cursor-pointer select-none">
+          <input type="checkbox" checked={autoRefresh} onChange={e => setAutoRefresh(e.target.checked)}
+            className="accent-emerald-500" />
+          Auto-Refresh (5s)
+        </label>
+
+        <button onClick={() => qc.invalidateQueries({ queryKey: ['logs'] })}
+          className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-gray-200 ml-auto">
+          <RefreshCw className="w-3 h-3" />
+          Aktualisieren
+        </button>
+        <button onClick={() => clear.mutate()} disabled={clear.isPending}
+          className="flex items-center gap-1.5 text-xs text-red-600 hover:text-red-400 disabled:opacity-50">
+          <Trash2 className="w-3 h-3" />
+          Leeren
+        </button>
+      </div>
+
+      {/* Zusammenfassung */}
+      {data && (
+        <div className="flex gap-4 text-xs text-gray-500">
+          <span>{data.total_returned} Einträge</span>
+          {data.error_count > 0 && (
+            <span className="flex items-center gap-1 text-red-400">
+              <AlertTriangle className="w-3 h-3" /> {data.error_count} Fehler
+            </span>
+          )}
+          {data.warning_count > 0 && (
+            <span className="flex items-center gap-1 text-yellow-400">
+              <Info className="w-3 h-3" /> {data.warning_count} Warnungen
+            </span>
+          )}
+          {autoRefresh && (
+            <span className="text-gray-600">
+              Stand: {new Date(dataUpdatedAt).toLocaleTimeString('de-DE')}
+            </span>
+          )}
+        </div>
+      )}
+
+      {/* Log-Einträge */}
+      <div className="bg-gray-950 border border-gray-800 rounded-xl overflow-hidden max-h-[500px] overflow-y-auto font-mono">
+        {isLoading ? (
+          <p className="p-4 text-xs text-gray-500">Lade…</p>
+        ) : !data?.entries.length ? (
+          <p className="p-4 text-xs text-gray-500">Keine Einträge für diesen Filter</p>
+        ) : (
+          data.entries.map((entry, i) => <LogRow key={i} entry={entry} />)
+        )}
+      </div>
+    </div>
+  )
+}
+
 // ── Main ──────────────────────────────────────────────────────────────────────
 export default function Config() {
   const [tab, setTab] = useState<Tab>('universe')
@@ -363,6 +510,7 @@ export default function Config() {
           {tab === 'weights' && <WeightsTab />}
           {tab === 'scan' && <ScanConfigTab />}
           {tab === 'alerts' && <AlertsTab />}
+          {tab === 'logs'   && <LogsTab />}
         </Card>
       </div>
     </div>

@@ -1,0 +1,21 @@
+[Unit]
+Description=AIDepot – Aktien- & Optionsschein-Analyse
+After=network.target
+
+[Service]
+Type=simple
+# ANPASSEN: Pfad zum geklonten Repository
+WorkingDirectory=/home/DEINNUTZER/aidepot
+# ANPASSEN: Pfad zur Python-Umgebung (nach `python -m venv .venv`)
+ExecStart=/home/DEINNUTZER/aidepot/.venv/bin/uvicorn backend.main:app --host 0.0.0.0 --port 8000
+# ANPASSEN: Dein Linux-Nutzername
+User=DEINNUTZER
+Group=DEINNUTZER
+
+Restart=on-failure
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

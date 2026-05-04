@@ -1,0 +1,10 @@
+[Unit]
+Description=AIDepot – Backup täglich um 03:00 Uhr
+Requires=aidepot-backup.service
+
+[Timer]
+OnCalendar=*-*-* 03:00:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target

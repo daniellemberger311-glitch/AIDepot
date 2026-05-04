@@ -1,8 +1,10 @@
 import { NavLink, Outlet } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
 import {
   LayoutDashboard, Eye, TrendingUp, Briefcase,
-  History, FlaskConical, Settings,
+  History, FlaskConical, Settings, Clock,
 } from 'lucide-react'
+import { fetchScanStatus } from '../api/client'
 
 const NAV = [
   { to: '/',          icon: LayoutDashboard, label: 'Dashboard' },
@@ -14,6 +16,16 @@ const NAV = [
 ]
 
 export default function Layout() {
+  const { data: scanStatus } = useQuery({
+    queryKey: ['scanStatus'],
+    queryFn: fetchScanStatus,
+    refetchInterval: 60_000,
+  })
+
+  const lastScan = scanStatus?.last_completed
+    ? scanStatus.last_completed.slice(0, 16).replace('T', ' ')
+    : null
+
   return (
     <div className="flex min-h-screen">
       {/* Sidebar */}
@@ -24,6 +36,7 @@ export default function Layout() {
         <div className="px-3 mb-6 lg:hidden flex justify-center">
           <TrendingUp className="w-5 h-5 text-emerald-400" />
         </div>
+
         <div className="flex flex-col gap-1 px-2">
           {NAV.map(({ to, icon: Icon, label }) => (
             <NavLink
@@ -42,6 +55,29 @@ export default function Layout() {
               <span className="hidden lg:block">{label}</span>
             </NavLink>
           ))}
+        </div>
+
+        {/* Letzter Scan – immer sichtbar am Sidebar-Ende */}
+        <div className="mt-auto px-3 pt-4 border-t border-gray-800/60">
+          <div className="flex items-center gap-2 text-gray-600 hidden lg:flex">
+            <Clock className="w-3 h-3 flex-shrink-0" />
+            <div className="text-xs leading-tight">
+              {lastScan ? (
+                <>
+                  <p className="text-gray-600">Letzter Scan</p>
+                  <p className={`font-mono ${scanStatus?.error ? 'text-red-500' : 'text-gray-500'}`}>
+                    {lastScan} UTC
+                  </p>
+                </>
+              ) : (
+                <p className="text-gray-700">Noch kein Scan</p>
+              )}
+            </div>
+          </div>
+          {/* Kompakt-Version für schmale Sidebar */}
+          <div className="flex justify-center lg:hidden">
+            <Clock className={`w-3.5 h-3.5 ${scanStatus?.error ? 'text-red-500' : 'text-gray-700'}`} />
+          </div>
         </div>
       </nav>
 

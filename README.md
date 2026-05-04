@@ -20,11 +20,12 @@ Erkennt Aktien im Pre-Breakout-Aufbau (VCP-Muster) frühzeitig und begleitet Opt
 
 ## Voraussetzungen
 
-| Software | Mindestversion |
-|----------|---------------|
-| Python | 3.11 |
-| Node.js | 18 |
-| Git | beliebig |
+| Software | Mindestversion | Download |
+|----------|---------------|----------|
+| Python | 3.11 | https://python.org |
+| Node.js | 18 | https://nodejs.org |
+| Git | beliebig | https://git-scm.com |
+| sqlite3 | beliebig | vorinstalliert auf Ubuntu/Debian |
 
 ---
 
@@ -54,9 +55,8 @@ pip install -r backend/requirements.txt
 
 ```bash
 cp .env.example .env
+nano .env   # oder ein beliebiger Texteditor
 ```
-
-Datei `.env` öffnen und die Keys eintragen:
 
 | Variable | Dienst | Limit (Free) | Registrierung |
 |----------|--------|-------------|---------------|
@@ -74,6 +74,7 @@ Datei `.env` öffnen und die Keys eintragen:
 
 ```bash
 python scripts/init_db.py
+alembic stamp head
 ```
 
 Erstellt `data/aidepot.db` mit allen Tabellen und lädt das Ticker-Universum (~850 Aktien).
@@ -89,49 +90,30 @@ python scripts/test_fetchers.py
 ```bash
 cd frontend
 npm install
-npm run build
+npm run build   # erzeugt frontend/dist/ – wird vom Backend ausgeliefert
 cd ..
 ```
 
 ---
 
-## Starten
+## Als Heimserver-Dienst einrichten (empfohlen)
 
-### Entwicklungsmodus (zwei Terminals)
+Läuft dauerhaft im Hintergrund, startet automatisch beim Hochfahren,  
+erreichbar von jedem Gerät im Heimnetz.
 
-**Terminal 1 – Backend:**
+### Firewall freischalten
+
 ```bash
-source .venv/bin/activate   # Windows: .venv\Scripts\activate
-uvicorn backend.main:app --reload --port 8000
+sudo ufw allow 8000/tcp
+sudo ufw reload
 ```
 
-**Terminal 2 – Frontend:**
-```bash
-cd frontend
-npm run dev
-```
-
-App aufrufen: **http://localhost:5173**  
-Swagger-API-Doku: http://localhost:8000/docs
-
-### Produktionsmodus (ein Prozess)
-
-Das gebaute Frontend (`frontend/dist/`) wird direkt von FastAPI serviert – kein Node.js nötig:
+### Systemd-Dienst installieren
 
 ```bash
-uvicorn backend.main:app --host 0.0.0.0 --port 8000
-```
+# DEINNUTZER in der Service-Datei durch deinen Linux-Nutzernamen ersetzen (2× in der Datei)
+nano aidepot.service
 
-App aufrufen: **http://localhost:8000** (oder `http://<IP>:8000` aus dem Heimnetz)
-
----
-
-## Automatischer Start (Linux/systemd)
-
-Damit die App beim Booten automatisch startet und nach Abstürzen neu startet:
-
-```bash
-# Pfad in aidepot.service anpassen (WorkingDirectory + User)
 sudo cp aidepot.service /etc/systemd/system/
 sudo systemctl daemon-reload
 sudo systemctl enable --now aidepot
@@ -140,8 +122,38 @@ sudo systemctl enable --now aidepot
 sudo systemctl status aidepot
 ```
 
-Erreichbar aus dem Heimnetz (Android, Windows, etc.) über `http://<Linux-PC-IP>:8000`.  
-Die IP des Linux-PCs herausfinden: `ip addr show | grep "inet "`
+### Automatisches Datenbank-Backup einrichten
+
+Sichert die Datenbank täglich um 03:00 Uhr, behält die letzten 7 Kopien in `data/backups/`.
+
+```bash
+chmod +x scripts/backup.sh
+
+# DEINNUTZER in aidepot-backup.service anpassen
+nano aidepot-backup.service
+
+sudo cp aidepot-backup.service aidepot-backup.timer /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now aidepot-backup.timer
+
+# Timer-Status prüfen
+sudo systemctl list-timers aidepot-backup.timer
+```
+
+### IP-Adresse des Servers herausfinden
+
+```bash
+ip addr show | grep "inet " | grep -v 127.0.0.1
+# Beispiel: inet 192.168.1.50/24
+```
+
+**Zugriff von anderen Geräten im Heimnetz:**
+```
+http://192.168.1.50:8000
+```
+
+> **Tipp:** Dem Server im Router eine feste IP zuweisen (DHCP-Reservierung nach MAC-Adresse),  
+> damit sich die Adresse nie ändert. In der Fritzbox: *Heimnetz → Netzwerk → Netzwerkverbindungen*.
 
 ---
 
@@ -156,17 +168,20 @@ Bricht bei fehlschlagenden Tests ab, bevor die Datenbank angefasst wird.
 
 ---
 
-## Automatisches Backup
+## Lokale Entwicklung (ohne Dienst)
 
-Die Datenbank wird täglich um 03:00 UTC gesichert (7 rotierende Kopien in `data/backups/`):
+Zwei Terminals öffnen:
 
 ```bash
-sudo cp aidepot-backup.service aidepot-backup.timer /etc/systemd/system/
-sudo systemctl daemon-reload
-sudo systemctl enable --now aidepot-backup.timer
+# Terminal 1 – Backend
+source .venv/bin/activate
+uvicorn backend.main:app --reload --port 8000
+
+# Terminal 2 – Frontend (mit Hot Reload)
+cd frontend && npm run dev
 ```
 
-Backup manuell auslösen: `bash scripts/backup.sh`
+App: **http://localhost:5173** · API-Doku: **http://localhost:8000/docs**
 
 ---
 
@@ -179,12 +194,27 @@ Der automatische Tagesscan läuft täglich um **06:00 UTC**.
 
 ---
 
+## Logs anschauen
+
+```bash
+# Live-Logs des Dienstes
+sudo journalctl -u aidepot -f
+
+# Letzte 100 Zeilen
+sudo journalctl -u aidepot -n 100
+```
+
+In-App-Logs sind direkt im **Config**-Tab unter „Logs" einsehbar.
+
+---
+
 ## Telegram einrichten (optional)
 
 1. In Telegram `@BotFather` anschreiben → `/newbot` → Token kopieren → `.env`: `TELEGRAM_BOT_TOKEN=...`
 2. Den Bot einmal selbst anschreiben (beliebige Nachricht)
 3. URL aufrufen: `https://api.telegram.org/bot<TOKEN>/getUpdates`
 4. `"chat": {"id": ...}` aus der Antwort kopieren → `.env`: `TELEGRAM_CHAT_ID=...`
+5. Dienst neu starten: `sudo systemctl restart aidepot`
 
 ---
 
@@ -221,10 +251,11 @@ AIDepot/
 │   ├── init_db.py           # DB einmalig initialisieren
 │   ├── backup.sh            # Manuelles Backup
 │   └── test_fetchers.py     # API-Keys testen
+├── data/                    # SQLite-Datenbank (wird angelegt)
+│   └── backups/             # Tägliche DB-Backups (wird angelegt)
 ├── update.sh                # Einzeiler-Deployment
 ├── aidepot.service          # systemd-Service-Unit
 ├── aidepot-backup.timer     # systemd-Backup-Timer
-├── data/                    # SQLite-Datenbank (wird angelegt)
 ├── .env.example             # API-Keys Vorlage
 └── docs/                    # Technische Dokumentation
 ```

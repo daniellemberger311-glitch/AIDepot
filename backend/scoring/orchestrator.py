@@ -175,6 +175,14 @@ def score_ticker(
     days_earn         = l1_bd.get("_days_earn")
     next_earnings_str = l1_bd.get("_next_earnings_date")
 
+    # Kurs + Währung aus Cache (kein extra API-Call, bereits in L1 abgerufen)
+    try:
+        yf_info    = YFinanceFetcher(db).get_fundamentals(ticker)
+        close_price = yf_info.get("price")
+        currency    = yf_info.get("currency") or "USD"
+    except Exception:
+        close_price, currency = None, "USD"
+
     # ── DB-Daten vorbereiten ─────────────────────────────────────────────────
     daily_data = {
         "total_score":      total_score,
@@ -188,6 +196,8 @@ def score_ticker(
         "strongest_signal": strongest,
         "next_catalyst":    next_earnings_str,
         "catalyst_days":    days_earn,
+        "close_price":      close_price,
+        "currency":         currency,
     }
 
     breakdown_data = {

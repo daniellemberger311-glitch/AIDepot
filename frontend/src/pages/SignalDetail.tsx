@@ -11,6 +11,15 @@ import ScoreBar from '../components/ScoreBar'
 
 const ZONE_COLORS: Record<number, string> = { 1: '#10b981', 2: '#eab308', 3: '#f97316', 4: '#6b7280' }
 
+function fmtPrice(price: number | null | undefined, currency: string | null | undefined): string {
+  if (price == null) return '–'
+  const p = price.toFixed(2)
+  if (!currency || currency === 'USD') return `$${p}`
+  if (currency === 'EUR') return `${p} €`
+  if (currency === 'GBP') return `£${p}`
+  return `${p} ${currency}`
+}
+
 function Row({ label, value, color }: { label: string; value: string | number; color?: string }) {
   return (
     <div className="flex justify-between items-center py-1.5 border-b border-gray-800/60 last:border-0">
@@ -143,6 +152,7 @@ export default function SignalDetail() {
 
           {/* Meta */}
           <Card title="Details">
+            <Row label="Kurs" value={fmtPrice(signal.close_price, signal.currency)} />
             <Row label="Sektor" value={signal.sector ?? '–'} />
             <Row label="Score-Datum" value={signal.score_date.slice(0, 10)} />
             <Row label="Stärkstes Signal" value={signal.strongest_signal ?? '–'} />

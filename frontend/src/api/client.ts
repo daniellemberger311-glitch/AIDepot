@@ -3,7 +3,7 @@ import type {
   StockScore, ScoreHistoryPoint, Dashboard, Position, PositionCreate,
   Transaction, SignalQuality, HistorySummary, AppConfig, ApiStatus,
   ScanStatus, ScanSchedule, UniverseTicker, ZoneSummary,
-  BacktestResult,
+  BacktestResult, LogResponse,
 } from '../types/api'
 
 const api = axios.create({ baseURL: '/api', timeout: 30_000 })
@@ -69,6 +69,9 @@ export const triggerScan = () =>
 export const fetchScanStatus = () =>
   api.get<ScanStatus>('/scan/status').then(r => r.data)
 
+export const cancelScan = () =>
+  api.post('/scan/cancel').then(r => r.data)
+
 export const scanTicker = (ticker: string) =>
   api.post(`/scan/ticker/${ticker}`).then(r => r.data)
 
@@ -104,3 +107,10 @@ export const refreshUniverse = () =>
 // ── Backtesting ────────────────────────────────────────────────────────────
 export const runBacktest = (ticker: string, from_date: string, to_date: string) =>
   api.post<BacktestResult>('/backtest', { ticker, from_date, to_date }).then(r => r.data)
+
+// ── Logs ───────────────────────────────────────────────────────────────────
+export const fetchLogs = (params?: { level?: string; module?: string; limit?: number }) =>
+  api.get<LogResponse>('/logs', { params }).then(r => r.data)
+
+export const clearLogs = () =>
+  api.delete('/logs').then(r => r.data)

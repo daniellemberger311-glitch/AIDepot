@@ -50,6 +50,8 @@ export interface StockScore {
   next_catalyst: string | null
   catalyst_days: number | null
   score_date: string
+  close_price: number | null
+  currency: string | null
   breakdown: ScoreBreakdown | null
   options_rec: OptionsRec | null
 }
@@ -222,6 +224,21 @@ export interface ZoneSummary {
   date: string | null
   total: number
   zones: Record<number, number>
+}
+
+// Logs
+export interface LogEntry {
+  timestamp: string
+  level: 'DEBUG' | 'INFO' | 'WARNING' | 'ERROR' | 'CRITICAL'
+  logger: string
+  message: string
+}
+
+export interface LogResponse {
+  total_returned: number
+  error_count: number
+  warning_count: number
+  entries: LogEntry[]
 }
 
 // Backtesting

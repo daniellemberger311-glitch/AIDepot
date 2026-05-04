@@ -1,0 +1,10 @@
+[Unit]
+Description=AIDepot – tägliches Datenbank-Backup
+After=aidepot.service
+
+[Service]
+Type=oneshot
+# ANPASSEN: Pfad zum Repository
+ExecStart=/home/DEINNUTZER/aidepot/scripts/backup.sh
+# ANPASSEN: Dein Linux-Nutzername
+User=DEINNUTZER

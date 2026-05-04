@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
-import { TrendingUp, AlertTriangle, Briefcase, Play, RefreshCw } from 'lucide-react'
-import { fetchDashboard, fetchScanStatus, triggerScan, acknowledgeSignal } from '../api/client'
+import { TrendingUp, AlertTriangle, Play, RefreshCw, Square } from 'lucide-react'
+import { fetchDashboard, fetchScanStatus, triggerScan, cancelScan, acknowledgeSignal } from '../api/client'
 import Card from '../components/Card'
 import PageHeader from '../components/PageHeader'
 import ZoneBadge from '../components/ZoneBadge'
@@ -26,8 +26,9 @@ export default function Dashboard() {
   const { data: dash, isLoading } = useQuery({ queryKey: ['dashboard'], queryFn: fetchDashboard, refetchInterval: 60_000 })
   const { data: scanStatus } = useQuery({ queryKey: ['scanStatus'], queryFn: fetchScanStatus, refetchInterval: 5_000 })
 
-  const scan = useMutation({ mutationFn: triggerScan, onSuccess: () => qc.invalidateQueries({ queryKey: ['scanStatus'] }) })
-  const ack  = useMutation({ mutationFn: acknowledgeSignal, onSuccess: () => qc.invalidateQueries({ queryKey: ['dashboard'] }) })
+  const scan   = useMutation({ mutationFn: triggerScan,  onSuccess: () => qc.invalidateQueries({ queryKey: ['scanStatus'] }) })
+  const cancel = useMutation({ mutationFn: cancelScan,   onSuccess: () => qc.invalidateQueries({ queryKey: ['scanStatus'] }) })
+  const ack    = useMutation({ mutationFn: acknowledgeSignal, onSuccess: () => qc.invalidateQueries({ queryKey: ['dashboard'] }) })
 
   if (isLoading) return <div className="p-6 text-gray-500">Lade…</div>
 
@@ -40,16 +41,42 @@ export default function Dashboard() {
         title="Dashboard"
         subtitle={scanStatus?.last_completed ? `Letzter Scan: ${scanStatus.last_completed.slice(0, 16).replace('T', ' ')} UTC` : 'Noch kein Scan'}
         action={
-          <button
-            onClick={() => scan.mutate()}
-            disabled={scanStatus?.running || scan.isPending}
-            className="flex items-center gap-2 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 disabled:bg-gray-700 disabled:text-gray-500 text-white text-sm rounded-lg transition-colors"
-          >
-            {scanStatus?.running ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
-            {scanStatus?.running ? `Scan läuft… ${scanStatus.progress}/${scanStatus.total}` : 'Scan starten'}
-          </button>
+          <div className="flex items-center gap-2">
+            {scanStatus?.running && (
+              <button
+                onClick={() => cancel.mutate()}
+                disabled={cancel.isPending}
+                className="flex items-center gap-2 px-3 py-1.5 bg-gray-700 hover:bg-red-800 disabled:opacity-50 text-gray-300 text-sm rounded-lg transition-colors"
+              >
+                <Square className="w-3.5 h-3.5" />
+                Abbrechen
+              </button>
+            )}
+            <button
+              onClick={() => scan.mutate()}
+              disabled={scanStatus?.running || scan.isPending}
+              className="flex items-center gap-2 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 disabled:bg-gray-700 disabled:text-gray-500 text-white text-sm rounded-lg transition-colors"
+            >
+              {scanStatus?.running ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
+              {scanStatus?.running ? `Scan läuft… ${scanStatus.progress}/${scanStatus.total}` : 'Scan starten'}
+            </button>
+          </div>
         }
       />
+
+      {/* Scan-Fehler-Banner */}
+      {scanStatus?.error && (
+        <div className="mx-6 mt-4 flex items-start gap-3 p-3 bg-red-900/20 border border-red-700/40 rounded-xl">
+          <AlertTriangle className="w-4 h-4 text-red-400 flex-shrink-0 mt-0.5" />
+          <div className="text-sm">
+            <span className="font-medium text-red-300">Letzter Scan fehlgeschlagen: </span>
+            <span className="text-red-400">{scanStatus.error}</span>
+            {scanStatus.tickers_failed.length > 0 && (
+              <span className="text-red-600 ml-1">({scanStatus.tickers_failed.length} Ticker fehlgeschlagen)</span>
+            )}
+          </div>
+        </div>
+      )}
 
       <div className="p-6 space-y-6">
         {/* KPIs */}
