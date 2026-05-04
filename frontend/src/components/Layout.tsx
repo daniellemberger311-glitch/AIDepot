@@ -28,8 +28,8 @@ export default function Layout() {
 
   return (
     <div className="flex min-h-screen">
-      {/* Sidebar */}
-      <nav className="w-14 lg:w-52 flex-shrink-0 bg-gray-900 border-r border-gray-800 flex flex-col py-4">
+      {/* Sidebar – nur auf md+ sichtbar */}
+      <nav className="hidden md:flex w-14 lg:w-52 flex-shrink-0 flex-col bg-gray-900 border-r border-gray-800 py-4">
         <div className="px-3 mb-6 hidden lg:block">
           <span className="text-lg font-bold text-white tracking-tight">AI<span className="text-emerald-400">Depot</span></span>
         </div>
@@ -57,9 +57,9 @@ export default function Layout() {
           ))}
         </div>
 
-        {/* Letzter Scan – immer sichtbar am Sidebar-Ende */}
+        {/* Letzter Scan */}
         <div className="mt-auto px-3 pt-4 border-t border-gray-800/60">
-          <div className="flex items-center gap-2 text-gray-600 hidden lg:flex">
+          <div className="items-center gap-2 text-gray-600 hidden lg:flex">
             <Clock className="w-3 h-3 flex-shrink-0" />
             <div className="text-xs leading-tight">
               {lastScan ? (
@@ -74,17 +74,38 @@ export default function Layout() {
               )}
             </div>
           </div>
-          {/* Kompakt-Version für schmale Sidebar */}
           <div className="flex justify-center lg:hidden">
             <Clock className={`w-3.5 h-3.5 ${scanStatus?.error ? 'text-red-500' : 'text-gray-700'}`} />
           </div>
         </div>
       </nav>
 
-      {/* Hauptinhalt */}
-      <main className="flex-1 overflow-auto bg-gray-950">
+      {/* Hauptinhalt – pb-16 auf Mobile für die Bottom-Nav */}
+      <main className="flex-1 overflow-auto bg-gray-950 pb-16 md:pb-0">
         <Outlet />
       </main>
+
+      {/* Bottom Navigation – nur auf Mobile (<md) */}
+      <nav
+        className="md:hidden fixed bottom-0 inset-x-0 bg-gray-900 border-t border-gray-800 z-50 flex justify-around items-center px-1 pt-2"
+        style={{ paddingBottom: 'max(8px, env(safe-area-inset-bottom))' }}
+      >
+        {NAV.map(({ to, icon: Icon, label }) => (
+          <NavLink
+            key={to}
+            to={to}
+            end={to === '/'}
+            className={({ isActive }) =>
+              `flex flex-col items-center gap-0.5 py-1 px-2 rounded-lg transition-colors min-w-[44px] ${
+                isActive ? 'text-emerald-400' : 'text-gray-500 active:text-gray-300'
+              }`
+            }
+          >
+            <Icon className="w-5 h-5" />
+            <span className="text-[10px] leading-none">{label}</span>
+          </NavLink>
+        ))}
+      </nav>
     </div>
   )
 }

@@ -491,10 +491,10 @@ export default function Config() {
       <PageHeader title="Einstellungen" />
 
       <div className="p-6 space-y-4">
-        <div className="flex gap-1 border-b border-gray-800 pb-0">
+        <div className="flex overflow-x-auto gap-1 border-b border-gray-800 -mx-4 sm:-mx-6 px-4 sm:px-6 scrollbar-none">
           {TABS.map(t => (
             <button key={t.id} onClick={() => setTab(t.id)}
-              className={`px-4 py-2 text-sm font-medium transition-colors rounded-t-lg -mb-px ${
+              className={`flex-shrink-0 px-4 py-2 text-sm font-medium transition-colors rounded-t-lg -mb-px ${
                 tab === t.id
                   ? 'text-white border-b-2 border-emerald-500'
                   : 'text-gray-500 hover:text-gray-300'

@@ -58,7 +58,10 @@ export default function Dashboard() {
               className="flex items-center gap-2 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 disabled:bg-gray-700 disabled:text-gray-500 text-white text-sm rounded-lg transition-colors"
             >
               {scanStatus?.running ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
-              {scanStatus?.running ? `Scan läuft… ${scanStatus.progress}/${scanStatus.total}` : 'Scan starten'}
+              {scanStatus?.running
+                ? <><span className="hidden sm:inline">Scan läuft… {scanStatus.progress}/{scanStatus.total}</span><span className="sm:hidden">{scanStatus.progress}/{scanStatus.total}</span></>
+                : 'Scan starten'
+              }
             </button>
           </div>
         }
