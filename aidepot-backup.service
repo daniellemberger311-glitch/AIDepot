@@ -5,6 +5,6 @@ After=aidepot.service
 [Service]
 Type=oneshot
 # ANPASSEN: Pfad zum Repository
-ExecStart=/home/DEINNUTZER/aidepot/scripts/backup.sh
+ExecStart=/home/DEINNUTZER/AIDepot/scripts/backup.sh
 # ANPASSEN: Dein Linux-Nutzername
 User=DEINNUTZER
