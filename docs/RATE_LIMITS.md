@@ -1,5 +1,9 @@
 # Rate-Limit-Strategie
 
+Zuletzt aktualisiert: 2026-05-04
+
+---
+
 ## Überblick: Limits aller Datenquellen
 
 | Quelle | Limit | Schutz implementiert |
@@ -23,8 +27,8 @@ Täglich:    max. 25 Calls/Tag pro Key  →  mit 2 Keys: 50 Calls/Tag gesamt
 Pro Minute: max. 5 Calls/Minute        →  1 Call alle 12 Sekunden (13s mit Puffer)
 ```
 
-**Key-Rotation (implementiert):** Key 1 wird zuerst verwendet. Sobald sein Tageslimit
-erreicht ist, übernimmt automatisch Key 2. Beide Quoten werden separat in der
+**Key-Rotation (implementiert):** Key 1 wird zuerst verwendet. Sobald sein Tageslimit  
+erreicht ist, übernimmt automatisch Key 2. Beide Quoten werden separat in der  
 `configuration`-Tabelle verfolgt (`av_calls_today` und `av_calls_today_2`).
 
 ### Wie es implementiert ist
@@ -33,8 +37,7 @@ erreicht ist, übernimmt automatisch Key 2. Beide Quoten werden separat in der
 - Vor jedem echten API-Call wird `_enforce_rate_limit()` aufgerufen
 - Diese Funktion wartet, bis seit dem letzten Call mind. 13 Sekunden vergangen sind
 - 13 s statt 12 s = 1 Sekunde Puffer gegen Netz-Jitter
-- Der Timestamp ist **prozessglobal** – verhindert Überläufe auch wenn mehrere
-  Ticker schnell hintereinander gescannt werden
+- Der Timestamp ist **prozessglobal** – verhindert Überläufe auch wenn mehrere Ticker schnell hintereinander gescannt werden
 
 **Tageszähler in DB** (`configuration`-Tabelle):
 - Jeder erfolgreiche AV-Call erhöht `av_calls_today` um 1
@@ -47,19 +50,18 @@ erreicht ist, übernimmt automatisch Key 2. Beide Quoten werden separat in der
 ```
 → Der Fetcher erkennt diesen `"Note"`-Key und gibt `{}` zurück (kein Absturz).
 
-### Budget-Aufteilung (25 Calls/Tag)
+### Budget-Aufteilung (25 Calls/Tag pro Key)
 
 | Verwendung | Calls/Tag | Wann |
 |------------|-----------|------|
-| Zone-1-Aktien RSI/MACD | max. 10 | Scan 06:00 UTC |
-| Gehaltene Positionen | max. 5 | Scan 06:00 UTC |
+| Zone-1-Aktien (Top 10 nach Δ7T) | max. 10 | Scan 06:00 UTC |
+| Offene Positionen (Tier 0) | max. 5 | Scan 06:00 UTC |
 | Manuelle Refresh-Anfragen via UI | max. 5 | Jederzeit |
 | Reserve/Puffer | 5 | – |
 
-**Konsequenz:** Alpha Vantage ist NUR für die Top-15 Aktien des Tages.
-Für alle anderen Aktien (Zone 3+4) werden RSI, MACD und Bollinger lokal mit
-der `ta`-Bibliothek auf Basis von yfinance-OHLCV berechnet – **kein Limit,
-keine Kosten**.
+**Konsequenz:** Alpha Vantage ist NUR für die Top-15 Aktien des Tages reserviert.  
+Für alle anderen Aktien (Zone 3+4) werden RSI, MACD und Bollinger lokal mit der `ta`-Bibliothek  
+auf Basis von yfinance-OHLCV berechnet – **kein Limit, keine Kosten**.
 
 ---
 
@@ -68,22 +70,21 @@ keine Kosten**.
 ### Tier-Übersicht
 
 ```
-Tier 0  gehaltene Positionen (~5–20 Aktien)
-        → ALLE APIs: yfinance + ta + Finnhub + AV + StockTwits + SimFin
+Tier 0  Offene Positionen (~5–20 Aktien)
+        → ALLE APIs: yfinance + ta + Finnhub + AV + StockTwits + SimFin + Marketaux
 
 Tier 1  Zone 1+2 (~150 Aktien)
-        → yfinance + ta + Finnhub + StockTwits + ApeWisdom
+        → yfinance + ta + Finnhub + StockTwits + ApeWisdom + Marketaux
         → Alpha Vantage: nur Top 10 nach Δ7T (Budget-Schonung)
-        → SimFin: falls AV-Budget verbraucht
+        → SimFin: als AV-Fallback
 
 Tier 2  Zone 3 (~200 Aktien)
         → yfinance + ta + StockTwits + ApeWisdom
         → KEINE Quota-APIs (Finnhub, AV, Marketaux, SimFin)
-        → Fundamentals: yfinance (kostenlos)
+        → Fundamentals: nur yfinance (kostenlos)
 
 Tier 3  Zone 4 (~500+ Aktien, täglich 200 rotierend)
         → Nur yfinance + ta-Bibliothek
-        → Scan: 200 Aktien/Tag → gesamte Zone 4 alle ~2–3 Tage vollständig
         → KEINE weiteren APIs
 ```
 
@@ -96,16 +97,16 @@ Tier 3  Zone 4 (~500+ Aktien, täglich 200 rotierend)
 | 2 (Zone 3) | ~200 | täglich | täglich |
 | 3 (Zone 4) | ~500 | 200/Tag | alle 2–3 Tage |
 
-**→ Jede Aktie wird mindestens alle 3 Tage gescannt** (weit besser als wöchentlich).
+**→ Jede Aktie wird mindestens alle 3 Tage gescannt.**
 
 ### Zeitbedarf für den täglichen Scan
 
 ```
-yfinance (Tier 0–2, ~350 Aktien):    ~5 Min  (kein Sleep nötig)
-Finnhub (Tier 0–1, ~170 Aktien):     ~3 Min  (1s Sleep = 60/Min einhalten)
-StockTwits (Tier 0–2, ~350 Aktien):  ~12 Min (2s Sleep je Ticker)
-Alpha Vantage (max. 15 Aktien):      ~3 Min  (13s Sleep je Ticker)
-Zone 4 yfinance-Rotation (200):      ~3 Min
+yfinance (Tier 0–2, ~350 Aktien):      ~5 Min  (kein Sleep nötig)
+Finnhub (Tier 0–1, ~170 Aktien):       ~3 Min  (1s Sleep = 60/Min einhalten)
+StockTwits (Tier 0–2, ~350 Aktien):    ~12 Min (2s Sleep je Ticker)
+Alpha Vantage (max. 15 Aktien):        ~3 Min  (13s Sleep je Ticker)
+Zone 4 yfinance-Rotation (200):        ~3 Min
 
 Gesamt geschätzt: ~25–30 Minuten für den kompletten Tages-Scan
 ```
@@ -125,9 +126,9 @@ Bei ~170 Aktien (Tier 0+1) mit je 1 Finnhub-Call: **~3 Minuten**.
 
 ## Marketaux (100 News/Tag)
 
-Marketaux liefert News-Artikel, nicht einzelne Ticker-Calls.
-Mit `limit=3` pro Request decken 33 Requests = 33 Ticker ab.
-**Strategie:** Nur für Zone 1 einsetzen (max. 50 Ticker), Rest mit Finnhub oder ApeWisdom.
+Marketaux liefert News-Artikel (nicht einzelne Ticker-Lookups).  
+Mit `limit=3` pro Request: 33 Requests decken 33 Ticker ab.  
+**Strategie:** Nur für Zone 1 (max. 50 Ticker) und gehaltene Positionen einsetzen.
 
 ---
 
@@ -143,7 +144,7 @@ Mit `limit=3` pro Request decken 33 Requests = 33 Ticker ab.
 | Alpha-Vantage RSI/MACD | 4h | Tages-Indikator |
 | ApeWisdom Mentions | 1h | Reddit-Dynamik |
 | AV LISTING_STATUS | 7 Tage | Ändert sich kaum |
-| Wikipedia-Listen | 7 Tage | Quartalsweise Index-Änderungen |
+| Wikipedia-Listen (S&P 500, NASDAQ 100) | 7 Tage | Quartalsweise Index-Änderungen |
 
 ---
 
@@ -151,9 +152,11 @@ Mit `limit=3` pro Request decken 33 Requests = 33 Ticker ab.
 
 | Quelle fällt aus | Fallback |
 |-----------------|---------|
-| Alpha Vantage | RSI/MACD aus `ta`-Bibliothek + yfinance (kein Score-Verlust) |
+| Alpha Vantage | RSI/MACD/BB aus `ta`-Bibliothek + yfinance (kein Scoring-Verlust) |
 | Finnhub Sentiment | Marketaux oder ApeWisdom + StockTwits |
-| SimFin | yfinance Fundamentals (etwas ungenauer) |
+| Finnhub Insider | yfinance-Insider-Daten (weniger granular) |
+| SimFin | yfinance Fundamentals (FCF und D/E etwas ungenauer) |
 | Marketaux | Finnhub News-Sentiment |
-| StockTwits | Sentiment-Score = neutral (12,5/25) |
-| yfinance | App pausiert – keine Alternative (unverzichtbar) |
+| StockTwits | Sentiment-Score = neutral (3/7 für Bullish-Ratio) |
+| ApeWisdom | Reddit-Momentum = neutral (1/5) |
+| yfinance | App pausiert Scan – keine Alternative (unverzichtbar) |

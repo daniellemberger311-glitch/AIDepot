@@ -3,13 +3,13 @@
 Basis-URL: `http://localhost:8000/api`  
 Swagger-UI: `http://localhost:8000/docs`
 
-**Status-Legende:** ✅ implementiert | ⏳ Phase 3 | ⏳ Phase 4
+Alle Endpunkte sind implementiert ✅.
 
 ---
 
 ## Dashboard
 
-### `GET /api/dashboard` ⏳ Phase 3
+### `GET /api/dashboard` ✅
 Gesamtübersicht für die Startseite.
 
 **Response:**
@@ -27,33 +27,57 @@ Gesamtübersicht für die Startseite.
 
 ## Watchlist
 
-### `GET /api/watchlist` ⏳ Phase 3
+### `GET /api/watchlist` ✅
 Alle Aktien nach Zone und Score.
 
 **Query-Parameter:**
 - `zone` (optional): 1, 2, 3 oder 4 – filtert nach Zone
-- `sort` (optional): `delta_7d` (Standard), `score`, `delta_1d`
-- `limit` (optional): Standard 50
+- `sort` (optional): `total_score` (Standard), `delta_7d`, `delta_1d`, `ticker`
+- `limit` (optional): Standard 200
+- `breakdown` (optional): `true` – gibt Score-Breakdown-Felder mit zurück
 
-**Response:** Liste von `StockScoreOut`-Objekten
+**Response:** Liste von `StockScoreOut`-Objekten (inkl. `close_price`, `currency`)
+
+### `GET /api/watchlist/zones/summary` ✅
+Zonen-Zähler und Gesamt-Ticker-Anzahl.
+
+**Response:**
+```json
+{
+  "date": "2026-05-04",
+  "total": 742,
+  "zones": { "1": 12, "2": 45, "3": 183, "4": 502 }
+}
+```
 
 ---
 
 ## Signale
 
-### `GET /api/signals/{ticker}` ⏳ Phase 3
+### `GET /api/signals/{ticker}` ✅
 Vollständige Signal-Analyse für einen Ticker.
 
 **Response:**
 ```json
 {
   "ticker": "NVDA",
+  "name": "NVIDIA Corporation",
+  "sector": "Technology",
   "total_score": 82,
+  "l1_fundamentals": 34.0,
+  "l2_technicals": 28.0,
+  "l3_sentiment": 20.0,
   "zone": 1,
   "delta_1d": 3.1,
   "delta_7d": 12.4,
-  "breakdown": { ... alle Unterkriterien ... },
-  "history": [ { "score_date": "2025-04-01", "total_score": 70, "zone": 2 }, ... ],
+  "delta_30d": 8.2,
+  "close_price": 875.40,
+  "currency": "USD",
+  "strongest_signal": "VCP",
+  "next_catalyst": "2026-05-21",
+  "catalyst_days": 17,
+  "score_date": "2026-05-04",
+  "breakdown": { ... },
   "options_rec": {
     "direction": "CALL",
     "leverage_min": 5,
@@ -61,19 +85,32 @@ Vollständige Signal-Analyse für einen Ticker.
     "duration_weeks": 8,
     "ko_distance_pct": 13.5,
     "entry_trigger": 920.0,
-    "stop_loss": 845.0
+    "stop_loss": 845.0,
+    "base_price_at_rec": 875.40,
+    "atr_at_rec": 18.2
   }
 }
 ```
+
+### `GET /api/signals/{ticker}/history` ✅
+Score-Verlauf der letzten N Tage.
+
+**Query-Parameter:**
+- `days` (optional): Standard 30
+
+**Response:** Liste von `{ score_date, total_score, zone }`
 
 ---
 
 ## Portfolio
 
-### `GET /api/portfolio/positions` ⏳ Phase 3
-Alle offenen Positionen mit aktuellem Status.
+### `GET /api/portfolio` ✅
+Alle Positionen (offen und optional geschlossen).
 
-### `POST /api/portfolio/positions` ⏳ Phase 3
+**Query-Parameter:**
+- `include_closed` (optional): `true` – gibt auch abgeschlossene Positionen zurück
+
+### `POST /api/portfolio` ✅
 Neue Position erfassen.
 
 **Body:**
@@ -85,163 +122,205 @@ Neue Position erfassen.
   "isin": "DE000...",
   "quantity": 100,
   "entry_price": 12.50,
-  "entry_date": "2025-04-15",
+  "entry_date": "2026-04-15",
   "ko_level": 820.0,
-  "expiry_date": "2025-07-18",
-  "leverage": 6.0
+  "expiry_date": "2026-07-18",
+  "leverage": 6.0,
+  "underlying_at_entry": 875.40,
+  "notes": "VCP-Signal Zone 1"
 }
 ```
 
-### `PATCH /api/portfolio/positions/{id}/close` ⏳ Phase 3
+### `GET /api/portfolio/{id}` ✅
+Einzelne Position mit Exit-Signalen.
+
+### `PUT /api/portfolio/{id}/close` ✅
 Position schließen und P&L berechnen.
 
 **Body:**
 ```json
 {
   "sell_price": 17.30,
-  "sell_date": "2025-05-10"
+  "sell_date": "2026-05-10",
+  "notes": "Kursziel erreicht"
 }
 ```
 
-### `GET /api/portfolio/exit-signals` ⏳ Phase 3
-Alle offenen Exit-Signale (sortiert nach Priorität).
+### `DELETE /api/portfolio/{id}` ✅
+Position löschen (ohne Trade-Eintrag).
 
-### `PATCH /api/portfolio/exit-signals/{id}/acknowledge` ⏳ Phase 3
-Exit-Signal als gelesen markieren.
+### `POST /api/portfolio/{id}/check-exits` ✅
+Exit-Signale für eine Position manuell prüfen.
+
+### `GET /api/portfolio/{id}/transactions` ✅
+Alle Transaktionen einer Position.
+
+### `PUT /api/portfolio/signals/{id}/acknowledge` ✅
+Exit-Signal als quittiert markieren.
 
 ---
 
 ## Trade-Historie
 
-### `GET /api/history/trades` ⏳ Phase 3
+### `GET /api/history/trades` ✅
 Alle abgeschlossenen Trades.
 
 **Query-Parameter:**
+- `ticker` (optional): Filtert nach Ticker
 - `limit` (optional): Standard 100
 
-### `GET /api/history/signal-quality` ⏳ Phase 4
-Trefferquote pro Signaltyp für den Lerneffekt.
+### `GET /api/history/signal-quality` ✅
+Trefferquote pro Signaltyp.
+
+**Response:**
+```json
+[
+  {
+    "signal_type": "VCP",
+    "total_trades": 14,
+    "profitable": 10,
+    "win_rate_pct": 71.4,
+    "avg_pnl_pct": 18.3
+  }
+]
+```
+
+### `GET /api/history/summary` ✅
+Gesamtstatistik aller Trades.
 
 ---
 
 ## Scan
 
-### `POST /api/scan/trigger` ⏳ Phase 3
-Manuellen Scan starten (ohne auf 06:00 UTC zu warten).
+### `POST /api/scan/trigger` ✅
+Manuellen Vollscan starten (Background-Task).
 
-**Query-Parameter:**
-- `ticker` (optional): Nur diesen einen Ticker scannen
+**Response:** `{ "message": "Scan gestartet", "tickers": 842 }`
 
-### `GET /api/scan/status` ⏳ Phase 3
-Status des letzten Scans (Zeitstempel, Anzahl Ticker, Dauer).
+### `POST /api/scan/cancel` ✅
+Laufenden Scan abbrechen. Der aktuelle Ticker wird noch fertig gescannt.
+
+**Response:** `{ "message": "Abbruch angefordert – aktueller Ticker wird noch fertig" }`
+
+### `POST /api/scan/ticker/{ticker}` ✅
+Einzelnen Ticker sofort (synchron) rescannen.
+
+### `GET /api/scan/status` ✅
+Status des aktuellen oder letzten Scans.
+
+**Response:**
+```json
+{
+  "running": true,
+  "started_at": "2026-05-04T06:00:05Z",
+  "progress": 312,
+  "total": 842,
+  "current_ticker": "MSFT",
+  "last_completed": "2026-05-03T06:28:11Z",
+  "last_duration_sec": 1682,
+  "error": null,
+  "tickers_failed": []
+}
+```
 
 ---
 
 ## Konfiguration
 
-### `GET /api/config` ⏳ Phase 3
-Aktuelle Einstellungen laden.
+### `GET /api/config` ✅
+Aktuelle App-Einstellungen laden.
 
-### `PUT /api/config` ⏳ Phase 3
-Einstellungen aktualisieren (Gewichtungen, Schwellenwerte, Telegram).
+### `PUT /api/config` ✅
+Einstellungen aktualisieren. Alle Felder optional.
 
-**Body:** (alle Felder optional)
+**Body:**
 ```json
 {
   "weight_fundamental": 40,
   "weight_technical": 35,
   "weight_sentiment": 25,
   "zone1_min_score": 76,
-  "exit_score_drop": 15.0,
-  "exit_ko_distance": 8.0
+  "zone2_min_score": 61,
+  "zone3_min_score": 41,
+  "alert_delta_1d": 15,
+  "exit_score_drop": 15,
+  "exit_ko_distance": 8,
+  "exit_expiry_weeks": 3,
+  "exit_bull_ratio": 35
 }
 ```
 
-### `GET /api/config/status` ⏳ Phase 3
-Quota-Status aller APIs + letzter Scan-Zeitstempel.
+### `GET /api/config/status` ✅
+API-Key-Status aller Dienste.
 
 **Response:**
 ```json
 {
-  "alpha_vantage": {
-    "total_remaining": 38,
-    "limit_per_day": 25,
-    "keys": [
-      { "slot": "alpha_vantage_api_key", "remaining": 18 },
-      { "slot": "alpha_vantage_api_key_2", "remaining": 20 }
-    ],
-    "min_interval_secs": 13.0
-  },
-  "last_scan_at": "2026-05-03T06:02:11Z",
-  "last_scan_tickers": 842
+  "yfinance":      { "status": "ok",      "note": "kein Key erforderlich" },
+  "finnhub":       { "status": "ok",      "remaining_today": null },
+  "alpha_vantage": { "status": "ok",      "remaining_today": 22, "key_2_active": false },
+  "marketaux":     { "status": "ok" },
+  "simfin":        { "status": "ok" },
+  "stocktwits":    { "status": "ok",      "note": "kein Key erforderlich" },
+  "apewisdom":     { "status": "ok",      "note": "kein Key erforderlich" },
+  "telegram":      { "status": "missing", "note": "TELEGRAM_BOT_TOKEN nicht gesetzt" }
 }
 ```
+
+### `GET /api/config/scan-schedule` ✅
+Scan-Zeitplan und Zone-4-Rotations-Status.
 
 ---
 
 ## Universum
 
-### `GET /api/universe` ⏳ Phase 3
-Alle Aktien im Universum mit Quellen.
-
-### `GET /api/universe/search` ⏳ Phase 3
-Ticker oder Name suchen.
+### `GET /api/universe` ✅
+Alle Ticker mit Metadaten.
 
 **Query-Parameter:**
-- `q`: Suchbegriff (Ticker oder Firmenname)
-- `limit` (optional): Standard 20
+- `active_only` (optional): `true` – nur aktive Ticker
+- `source` (optional): z. B. `SP500`, `NASDAQ100`, `WATCHLIST`
 
-### `POST /api/universe/add` ⏳ Phase 3
-Aktie zur persönlichen Watchlist hinzufügen.
+### `GET /api/universe/search?q={suchbegriff}` ✅
+Ticker oder Firmenname in der Reserve-Datenbank suchen.
+
+### `POST /api/universe/add` ✅
+Ticker manuell hinzufügen.
 
 **Body:** `{ "ticker": "ASTS", "name": "AST SpaceMobile" }`
 
-### `DELETE /api/universe/{ticker}` ⏳ Phase 3
-Aktie aus persönlicher Watchlist entfernen.
+### `DELETE /api/universe/{ticker}` ✅
+Ticker deaktivieren (`is_active = false`). Historische Scores bleiben erhalten.
 
-### `POST /api/universe/refresh` ⏳ Phase 3
-Universum neu laden (S&P 500, NASDAQ 100, Russell 2000, Trending von StockTwits).  
-Dauert ~1–2 Minuten. Gibt die Anzahl neu hinzugefügter Ticker zurück.
+### `POST /api/universe/refresh` ✅
+Universum aktualisieren (S&P 500 + NASDAQ 100 von Wikipedia, NYSE/NASDAQ-Reserve via AV).
+
+**Response:** `{ "added": 3, "updated": 12, "total_active": 851 }`
 
 ---
 
 ## Logs
 
 ### `GET /api/logs` ✅
-In-Memory-Logs der laufenden Backend-Instanz abrufen.
+In-Memory-Logs der laufenden Backend-Instanz (Ringpuffer, max. 1000 Einträge).
 
 **Query-Parameter:**
 - `level` (optional): `DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL`
 - `module` (optional): Teilstring des Modulnamens (z. B. `alphavantage`)
 - `limit` (optional): 1–1000, Standard 200
-- `since` (optional): ISO-Zeitstempel – nur Einträge nach diesem Zeitpunkt
-
-**Response:**
-```json
-[
-  {
-    "timestamp": "2026-05-03T06:02:11.234Z",
-    "level": "WARNING",
-    "module": "backend.fetchers.alphavantage_fetcher",
-    "message": "Alpha Vantage Rate-Limit-Antwort (Slot alpha_vantage_api_key): Thank you..."
-  }
-]
-```
-
-### `GET /api/logs/summary` ✅
-Kompaktzusammenfassung: letzte 10 Fehler + Zähler.
 
 **Response:**
 ```json
 {
+  "total_returned": 42,
   "error_count": 2,
   "warning_count": 7,
-  "last_errors": [
+  "entries": [
     {
-      "timestamp": "2026-05-03T06:01:55.100Z",
-      "level": "ERROR",
-      "module": "backend.fetchers.finnhub_fetcher",
-      "message": "Finnhub API timeout: AAPL"
+      "timestamp": "2026-05-04T06:02:11.234Z",
+      "level": "WARNING",
+      "logger": "backend.fetchers.alphavantage_fetcher",
+      "message": "Alpha Vantage Rate-Limit erreicht (Slot 1)"
     }
   ]
 }
@@ -254,7 +333,7 @@ Log-Puffer leeren.
 
 ## Backtesting
 
-### `POST /api/backtest` ⏳ Phase 3
+### `POST /api/backtest` ✅
 Historische Signal-Simulation für einen Ticker.
 
 **Body:**
@@ -262,7 +341,7 @@ Historische Signal-Simulation für einen Ticker.
 {
   "ticker": "NVDA",
   "from_date": "2024-01-01",
-  "to_date": "2025-05-03"
+  "to_date": "2025-05-04"
 }
 ```
 
@@ -270,6 +349,8 @@ Historische Signal-Simulation für einen Ticker.
 ```json
 {
   "ticker": "NVDA",
+  "from_date": "2024-01-01",
+  "to_date": "2025-05-04",
   "price_data": [
     { "date": "2024-01-02", "close": 495.22, "score": 58, "zone": 3, "delta_1d": null, "delta_7d": null }
   ],
@@ -284,7 +365,8 @@ Historische Signal-Simulation für einen Ticker.
     }
   ],
   "total_signals": 12,
-  "zone1_entries": 3
+  "zone1_entries": 3,
+  "summary": { ... }
 }
 ```
 
@@ -295,6 +377,7 @@ Historische Signal-Simulation für einen Ticker.
 | Code | Bedeutung |
 |------|-----------|
 | 200 | Erfolg |
-| 404 | Ticker nicht gefunden |
+| 404 | Ticker / Ressource nicht gefunden |
+| 409 | Konflikt (z. B. Scan läuft bereits) |
 | 422 | Validierungsfehler (Pydantic) |
-| 500 | Interner Fehler (Details in Response) |
+| 500 | Interner Fehler (Details in Response-Body) |
