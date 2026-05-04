@@ -234,21 +234,26 @@ def _build_static_map() -> dict[str, str]:
 
 def load_static_universe(db: Session) -> int:
     """Schreibt alle statischen Ticker in die stocks-Tabelle.
-    Gibt Anzahl neu eingefügter Zeilen zurück.
+    Aktiviert bereits vorhandene inaktive Ticker (z.B. aus AV-Listing).
+    Gibt Anzahl neu eingefügter oder aktivierter Zeilen zurück.
     """
     mapping = _build_static_map()
-    added = 0
+    changed = 0
     for ticker, source in mapping.items():
         existing = db.get(Stock, ticker)
         if not existing:
             db.add(Stock(ticker=ticker, universe_source=source, is_active=1))
-            added += 1
+            changed += 1
+        elif not existing.is_active:
+            existing.is_active = 1
+            changed += 1
     db.commit()
+    total_active = db.query(Stock).filter(Stock.is_active == 1).count()
     logger.info(
-        "Statisches Universum geladen: %d neu | Gesamt: %d",
-        added, len(mapping)
+        "Statisches Universum geladen: %d aktiviert/neu | Gesamt aktiv: %d",
+        changed, total_active
     )
-    return added
+    return changed
 
 
 def load_from_wikipedia(db: Session) -> int:
