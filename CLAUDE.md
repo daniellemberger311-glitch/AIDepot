@@ -197,7 +197,7 @@ bash update.sh
 | Finnhub | `FINNHUB_API_KEY` | 60/Min | ✅ konfiguriert |
 | Marketaux | `MARKETAUX_API_KEY` | 100 News/Tag | ✅ konfiguriert |
 | SimFin | `SIMFIN_API_KEY` | unbegrenzt | ✅ konfiguriert |
-| Telegram | `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID` | kostenlos | ✅ konfiguriert (Bot noch nicht als Admin im Kanal) |
+| Telegram | `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID` | kostenlos | ✅ konfiguriert + Bot als Admin im Kanal |
 
 ## Scoring-Kurzreferenz
 

@@ -67,7 +67,7 @@ Zuletzt aktualisiert: 2026-05-04
 - 07:00 UTC – Telegram-Benachrichtigungen
 - So 02:00 UTC – Wikipedia-Refresh + Cache-Bereinigung
 
-**Notifications:** Code fertig. `TELEGRAM_BOT_TOKEN` + `TELEGRAM_CHAT_ID` in `.env` eingetragen (Bot muss noch als Admin in den Kanal aufgenommen werden).
+**Notifications:** ✅ vollständig konfiguriert. `TELEGRAM_BOT_TOKEN` + `TELEGRAM_CHAT_ID` in `.env`, Bot als Admin im Kanal `@ai_depot`.
 
 ---
 
@@ -137,7 +137,7 @@ Zuletzt aktualisiert: 2026-05-04
 | Optionsschein-Stammdaten | Kein Free-API → ISIN + KO manuell eintragen |
 | Historisches Sentiment | Für Backtesting: neutral 12,5/25 |
 | Unrealized P&L | Warrant-Preis nicht via API → manuell eintragen |
-| Telegram | BOT_TOKEN + CHAT_ID konfiguriert; Bot muss als Admin in Kanal aufgenommen werden |
+| Telegram | ✅ vollständig eingerichtet (BOT_TOKEN + CHAT_ID + Bot als Admin im Kanal) |
 | Scoring-Gewichtungen konfigurierbar | In Config-Seite einstellbar, aber Änderungen wirken erst ab nächstem Scan |
 
 ---
