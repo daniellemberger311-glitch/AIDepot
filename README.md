@@ -24,6 +24,7 @@ Erkennt Aktien im Pre-Breakout-Aufbau (VCP-Muster) frühzeitig und begleitet Opt
 | Python | 3.11 | https://python.org |
 | Node.js | 18 | https://nodejs.org |
 | Git | beliebig | https://git-scm.com |
+| sqlite3 | beliebig | vorinstalliert auf Ubuntu/Debian |
 
 ---
 
@@ -39,15 +40,8 @@ cd aidepot
 ### 2. Python-Umgebung einrichten
 
 ```bash
-# Virtuelle Umgebung erstellen
 python -m venv .venv
-
-# Aktivieren – Mac/Linux:
 source .venv/bin/activate
-# Aktivieren – Windows:
-.venv\Scripts\activate
-
-# Pakete installieren
 pip install -r backend/requirements.txt
 ```
 
@@ -55,9 +49,8 @@ pip install -r backend/requirements.txt
 
 ```bash
 cp .env.example .env
+nano .env   # oder ein beliebiger Texteditor
 ```
-
-Datei `.env` im Texteditor öffnen und die Keys eintragen:
 
 | Variable | Dienst | Limit (Free) | Registrierung |
 |----------|--------|-------------|---------------|
@@ -69,7 +62,7 @@ Datei `.env` im Texteditor öffnen und die Keys eintragen:
 | `TELEGRAM_BOT_TOKEN` | Telegram | kostenlos | optional – siehe unten |
 | `TELEGRAM_CHAT_ID` | Telegram | – | optional – siehe unten |
 
-> Alle 5 Daten-API-Keys sind kostenlos erhältlich. Ohne Telegram funktioniert die App vollständig – Benachrichtigungen werden dann nur nicht versendet.
+> Alle 5 Daten-API-Keys sind kostenlos erhältlich. Ohne Telegram funktioniert die App vollständig.
 
 ### 4. Datenbank initialisieren
 
@@ -85,34 +78,109 @@ Erstellt `data/aidepot.db` mit allen Tabellen und lädt das Ticker-Universum (~8
 python scripts/test_fetchers.py
 ```
 
-### 6. Frontend-Pakete installieren
+### 6. Frontend bauen
 
 ```bash
 cd frontend
 npm install
+npm run build   # erzeugt frontend/dist/ – wird vom Backend ausgeliefert
 cd ..
 ```
 
 ---
 
-## Starten
+## Als Heimserver-Dienst einrichten (empfohlen)
+
+Läuft dauerhaft im Hintergrund, startet automatisch beim Hochfahren,  
+erreichbar von jedem Gerät im Heimnetz.
+
+### Firewall freischalten
+
+```bash
+sudo ufw allow 8000/tcp
+sudo ufw reload
+```
+
+### Systemd-Dienst installieren
+
+```bash
+# Service-Datei kopieren
+sudo cp aidepot.service /etc/systemd/system/
+
+# DEINNUTZER durch deinen Linux-Nutzernamen ersetzen (2× in der Datei)
+sudo nano /etc/systemd/system/aidepot.service
+
+# Aktivieren und starten
+sudo systemctl daemon-reload
+sudo systemctl enable aidepot
+sudo systemctl start aidepot
+
+# Status prüfen
+sudo systemctl status aidepot
+```
+
+### Automatisches Datenbank-Backup einrichten
+
+Sichert die Datenbank täglich um 03:00 Uhr, behält die letzten 7 Kopien in `data/backups/`.
+
+```bash
+chmod +x scripts/backup.sh
+
+sudo cp aidepot-backup.service /etc/systemd/system/
+sudo cp aidepot-backup.timer   /etc/systemd/system/
+
+# DEINNUTZER in der Service-Datei anpassen
+sudo nano /etc/systemd/system/aidepot-backup.service
+
+sudo systemctl daemon-reload
+sudo systemctl enable --now aidepot-backup.timer
+
+# Timer-Status prüfen
+sudo systemctl list-timers aidepot-backup.timer
+```
+
+### IP-Adresse des Servers herausfinden
+
+```bash
+ip addr show | grep "inet " | grep -v 127.0.0.1
+# Beispiel: inet 192.168.1.50/24
+```
+
+**Zugriff von anderen Geräten im Heimnetz:**
+```
+http://192.168.1.50:8000
+```
+
+> **Tipp:** Dem Server im Router eine feste IP zuweisen (DHCP-Reservierung nach MAC-Adresse),  
+> damit sich die Adresse nie ändert. In der Fritzbox: *Heimnetz → Netzwerk → Netzwerkverbindungen*.
+
+---
+
+## Updates einspielen
+
+```bash
+bash update.sh
+```
+
+Das Script zieht den neuesten Stand von GitHub, aktualisiert Python-Pakete,  
+baut das Frontend neu und startet den Dienst automatisch neu.
+
+---
+
+## Lokale Entwicklung (ohne Dienst)
 
 Zwei Terminals öffnen:
 
-**Terminal 1 – Backend**
 ```bash
-source .venv/bin/activate   # Windows: .venv\Scripts\activate
+# Terminal 1 – Backend
+source .venv/bin/activate
 uvicorn backend.main:app --reload --port 8000
+
+# Terminal 2 – Frontend (mit Hot Reload)
+cd frontend && npm run dev
 ```
 
-**Terminal 2 – Frontend**
-```bash
-cd frontend
-npm run dev
-```
-
-App aufrufen: **http://localhost:5173**  
-Swagger-API-Doku: http://localhost:8000/docs
+App: **http://localhost:5173** · API-Doku: **http://localhost:8000/docs**
 
 ---
 
@@ -126,12 +194,28 @@ Der automatische Tagesscan läuft täglich um **06:00 UTC**.
 
 ---
 
+## Logs anschauen
+
+```bash
+# Live-Logs des Dienstes
+sudo journalctl -u aidepot -f
+
+# Letzte 100 Zeilen
+sudo journalctl -u aidepot -n 100
+
+# Backup-Log
+sudo journalctl -u aidepot-backup
+```
+
+---
+
 ## Telegram einrichten (optional)
 
-1. In Telegram `@BotFather` anschreiben → `/newbot` → Token kopieren → in `.env` als `TELEGRAM_BOT_TOKEN` eintragen
+1. In Telegram `@BotFather` anschreiben → `/newbot` → Token kopieren → in `.env` als `TELEGRAM_BOT_TOKEN`
 2. Den Bot einmal selbst anschreiben (beliebige Nachricht)
-3. Token-URL aufrufen: `https://api.telegram.org/bot<TOKEN>/getUpdates`
-4. `"chat": {"id": ...}` aus der Antwort kopieren → in `.env` als `TELEGRAM_CHAT_ID` eintragen
+3. Aufrufen: `https://api.telegram.org/bot<TOKEN>/getUpdates`
+4. `"chat": {"id": ...}` kopieren → in `.env` als `TELEGRAM_CHAT_ID`
+5. Dienst neu starten: `sudo systemctl restart aidepot`
 
 ---
 
@@ -154,8 +238,15 @@ AIDepot/
 │       └── api/client.ts    # Axios-API-Client
 ├── scripts/
 │   ├── init_db.py           # DB einmalig initialisieren
-│   └── test_fetchers.py     # API-Keys testen
-├── data/                    # SQLite-Datenbank (wird angelegt)
+│   ├── test_fetchers.py     # API-Keys testen
+│   └── backup.sh            # Manuelles Backup
+├── data/
+│   ├── aidepot.db           # SQLite-Datenbank (wird angelegt)
+│   └── backups/             # Tägliche DB-Backups (wird angelegt)
+├── aidepot.service          # systemd Hauptdienst
+├── aidepot-backup.service   # systemd Backup-Dienst
+├── aidepot-backup.timer     # systemd Backup-Timer (täglich 03:00)
+├── update.sh                # Update auf neueste Version
 ├── .env.example             # API-Keys Vorlage
 └── docs/                    # Technische Dokumentation
 ```
