@@ -29,7 +29,7 @@ function UniverseTab() {
   const [searchResults, setSearchResults] = useState<Awaited<ReturnType<typeof searchUniverse>>>([])
 
   const { data: universe = [], isLoading } = useQuery({
-    queryKey: ['universe'], queryFn: () => fetchUniverse({ active_only: false }),
+    queryKey: ['universe'], queryFn: () => fetchUniverse({ active_only: true }),
   })
 
   const doSearch = useMutation({
