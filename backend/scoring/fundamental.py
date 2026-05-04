@@ -45,6 +45,8 @@ def score_pe_vs_sector(pe_ratio: float | None, sector: str) -> float:
     """KGV vs. Sektorschnitt – max. 8 Pkt."""
     if pe_ratio is None or pe_ratio <= 0:
         return 2.0  # neutral bei fehlenden Daten
+    if not sector or sector not in SECTOR_PE_AVERAGES:
+        return 2.0  # neutral wenn Sektor unbekannt – kein Vergleich möglich
     avg = _sector_pe(sector)
     ratio = pe_ratio / avg
     if ratio < 0.75:
@@ -85,7 +87,7 @@ def score_revenue_growth(growth_rate: float | None) -> float:
 def score_fcf(fcf: float | None, fcf_prev: float | None) -> float:
     """FCF positiv und wachsend – max. 5 Pkt."""
     if fcf is None:
-        return 0.0
+        return 1.0  # neutral bei fehlenden Daten (wie andere Kriterien)
     pts = 0.0
     if fcf > 0:
         pts += 2.0

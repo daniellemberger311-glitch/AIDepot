@@ -39,9 +39,10 @@ class TestPeVsSector:
         # 50/28=1.79 → 0
         assert score_pe_vs_sector(50.0, "Technology") == 0.0
 
-    def test_unknown_sector_uses_default_avg_20(self):
-        # Default=20; 14/20=0.70 < 0.75 → 8
-        assert score_pe_vs_sector(14.0, "UnknownSector") == 8.0
+    def test_unknown_sector_returns_neutral(self):
+        # Unbekannter Sektor → kein Vergleich möglich → neutral 2.0
+        assert score_pe_vs_sector(14.0, "UnknownSector") == 2.0
+        assert score_pe_vs_sector(14.0, "") == 2.0
 
 
 class TestEpsBeatStreak:
@@ -97,8 +98,9 @@ class TestRevenueGrowth:
 
 
 class TestFcf:
-    def test_none_returns_zero(self):
-        assert score_fcf(None, None) == 0.0
+    def test_none_returns_neutral(self):
+        # Keine Daten → neutral 1.0 (konsistent mit anderen Kriterien)
+        assert score_fcf(None, None) == 1.0
 
     def test_negative_fcf(self):
         assert score_fcf(-1_000_000, None) == 0.0
