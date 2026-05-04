@@ -69,6 +69,9 @@ export const triggerScan = () =>
 export const fetchScanStatus = () =>
   api.get<ScanStatus>('/scan/status').then(r => r.data)
 
+export const cancelScan = () =>
+  api.post('/scan/cancel').then(r => r.data)
+
 export const scanTicker = (ticker: string) =>
   api.post(`/scan/ticker/${ticker}`).then(r => r.data)
 

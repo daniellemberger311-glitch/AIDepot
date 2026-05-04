@@ -66,6 +66,8 @@ def build_score_out(
         next_catalyst    = ds.next_catalyst,
         catalyst_days    = ds.catalyst_days,
         score_date       = ds.score_date,
+        close_price      = ds.close_price,
+        currency         = ds.currency or "USD",
         breakdown        = bd_out,
         options_rec      = rec_out,
     )

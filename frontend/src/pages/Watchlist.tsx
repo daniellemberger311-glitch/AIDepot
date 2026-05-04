@@ -8,6 +8,15 @@ import ZoneBadge from '../components/ZoneBadge'
 import ScoreBar from '../components/ScoreBar'
 import DeltaBadge from '../components/DeltaBadge'
 
+function fmtPrice(price: number | null | undefined, currency: string | null | undefined): string {
+  if (price == null) return '–'
+  const p = price.toFixed(2)
+  if (!currency || currency === 'USD') return `$${p}`
+  if (currency === 'EUR') return `${p} €`
+  if (currency === 'GBP') return `£${p}`
+  return `${p} ${currency}`
+}
+
 const ZONE_LABELS: Record<number, string> = {
   0: 'Alle',
   1: 'Zone 1 – Kaufzone',
@@ -94,6 +103,7 @@ export default function Watchlist() {
                 <th className="text-left px-4 py-3 cursor-pointer hover:text-gray-300" onClick={() => toggleSort('total_score')}>
                   Score <SortIcon k="total_score" />
                 </th>
+                <th className="hidden md:table-cell text-right px-4 py-3 text-gray-500">Kurs</th>
                 <th className="hidden sm:table-cell text-right px-4 py-3 cursor-pointer hover:text-gray-300" onClick={() => toggleSort('delta_1d')}>
                   Δ1T <SortIcon k="delta_1d" />
                 </th>
@@ -136,6 +146,9 @@ export default function Watchlist() {
                           <ScoreBar score={s.total_score} zone={s.zone} />
                         </div>
                       </div>
+                    </td>
+                    <td className="hidden md:table-cell px-4 py-3 text-right font-mono text-sm text-gray-300">
+                      {fmtPrice(s.close_price, s.currency)}
                     </td>
                     <td className="hidden sm:table-cell px-4 py-3 text-right">
                       <DeltaBadge value={s.delta_1d} />

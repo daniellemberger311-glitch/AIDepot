@@ -40,6 +40,8 @@ class DailyScore(Base):
     strongest_signal = Column(String)
     next_catalyst   = Column(String)
     catalyst_days   = Column(Integer)
+    close_price     = Column(Float)
+    currency        = Column(String, default="USD")
     created_at      = Column(String, default=lambda: datetime.utcnow().isoformat())
 
 

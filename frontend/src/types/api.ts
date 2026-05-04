@@ -50,6 +50,8 @@ export interface StockScore {
   next_catalyst: string | null
   catalyst_days: number | null
   score_date: string
+  close_price: number | null
+  currency: string | null
   breakdown: ScoreBreakdown | null
   options_rec: OptionsRec | null
 }

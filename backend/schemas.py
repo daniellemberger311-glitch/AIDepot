@@ -54,6 +54,8 @@ class StockScoreOut(BaseModel):
     next_catalyst: Optional[str]
     catalyst_days: Optional[int]
     score_date: str
+    close_price: Optional[float] = None
+    currency: Optional[str] = "USD"
     breakdown: Optional[ScoreBreakdownOut] = None
     options_rec: Optional[OptionsRecOut] = None
 

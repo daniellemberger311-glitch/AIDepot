@@ -29,6 +29,7 @@ scan_state: dict = {
     "error":             None,
     "tickers_done":      [],
     "tickers_failed":    [],
+    "cancelled":         False,
 }
 
 
@@ -51,6 +52,7 @@ def run_scan(ticker_list: Optional[list[str]] = None) -> None:
         "error":          None,
         "tickers_done":   [],
         "tickers_failed": [],
+        "cancelled":      False,
     })
 
     start_ts = time.monotonic()
@@ -63,6 +65,10 @@ def run_scan(ticker_list: Optional[list[str]] = None) -> None:
 
             from backend.scoring.orchestrator import score_ticker_safe
             for i, ticker in enumerate(tickers):
+                if scan_state["cancelled"]:
+                    logger.info("Scan manuell abgebrochen nach %d/%d Tickern", i, len(tickers))
+                    scan_state["error"] = f"Manuell abgebrochen nach {i} von {len(tickers)} Tickern"
+                    break
                 scan_state["current_ticker"] = ticker
                 result = score_ticker_safe(ticker, db)
                 scan_state["progress"] = i + 1
@@ -133,6 +139,15 @@ def get_scan_status():
         "error":             scan_state["error"],
         "tickers_failed":    scan_state["tickers_failed"],
     }
+
+
+@router.post("/cancel", summary="Laufenden Scan abbrechen")
+def cancel_scan():
+    """Setzt ein Abbruch-Flag – der aktuelle Ticker wird noch abgeschlossen."""
+    if not scan_state["running"]:
+        return {"message": "Kein Scan aktiv"}
+    scan_state["cancelled"] = True
+    return {"message": "Abbruch angefordert – aktueller Ticker wird noch fertig"}
 
 
 @router.post("/ticker/{ticker}", summary="Einzelnen Ticker scannen")
