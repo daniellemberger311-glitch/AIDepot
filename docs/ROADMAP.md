@@ -132,6 +132,12 @@ Ticker + Zeitraum eingeben → sehen, wann welche Signale aufgetreten wären.
 
 **Währungsformatierung:** `$` für USD, `€` für EUR, `£` für GBP, `CODE` für andere – aus yfinance-Metadaten.
 
+**Responsive Layout:**
+- Desktop (≥ md / 768px): Sidebar links (Icons auf md, Icons+Labels auf lg)
+- Mobile (< md): Sidebar ausgeblendet, fixe Bottom-Navigation mit Icons + Labels
+- PageHeader: stacked auf Mobile (Titel oben, Action-Buttons darunter)
+- Config-Tabs: horizontal scrollbar auf Mobile
+
 ---
 
 ## Phase 6 – Produktion + Qualitätssicherung ✅
@@ -174,6 +180,20 @@ git pull origin main
 cd frontend && npm install --silent && npm run build && cd ..
 sudo systemctl restart aidepot
 ```
+
+### Responsive UI
+
+| Breakpoint | Layout |
+|------------|--------|
+| < md (< 768px) | Bottom-Navigation (6 Icons + Labels), kein Sidebar |
+| md (768px+) | Sidebar links (Icons only, 56px), kein Bottom-Nav |
+| lg (1024px+) | Sidebar links mit Labels (208px) |
+
+Umsetzung in:
+- `Layout.tsx`: `hidden md:flex` für Sidebar, `md:hidden fixed bottom-0` für Bottom-Nav
+- `PageHeader.tsx`: `flex-col sm:flex-row` – stacked auf Mobile
+- `Config.tsx`: `overflow-x-auto scrollbar-none` für Tab-Leiste
+- `index.css`: `.scrollbar-none` Utility
 
 ### Unit-Tests (133 Tests, alle grün)
 

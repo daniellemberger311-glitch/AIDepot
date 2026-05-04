@@ -29,6 +29,7 @@ Ziel: Aktien im Pre-Breakout-Aufbau (VCP-Muster wie ASTS, SNDK, NVDA) frühzeiti
 | systemd-Service + Backup-Timer | ✅ fertig |
 | Unit-Tests Scoring-Engine (`tests/`) | ✅ fertig – 133 Tests |
 | `update.sh` (Einzeiler-Deployment) | ✅ fertig |
+| Responsive UI (Mobile Bottom-Nav + Desktop Sidebar) | ✅ fertig |
 
 Detaillierter Fortschritt → `TODO.md`  
 Entwicklungs-Roadmap → `docs/ROADMAP.md`
@@ -196,7 +197,7 @@ bash update.sh
 | Finnhub | `FINNHUB_API_KEY` | 60/Min | ✅ konfiguriert |
 | Marketaux | `MARKETAUX_API_KEY` | 100 News/Tag | ✅ konfiguriert |
 | SimFin | `SIMFIN_API_KEY` | unbegrenzt | ✅ konfiguriert |
-| Telegram | `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID` | kostenlos | ⏳ noch nicht eingerichtet |
+| Telegram | `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID` | kostenlos | ✅ konfiguriert (Bot noch nicht als Admin im Kanal) |
 
 ## Scoring-Kurzreferenz
 

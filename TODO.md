@@ -67,7 +67,7 @@ Zuletzt aktualisiert: 2026-05-04
 - 07:00 UTC – Telegram-Benachrichtigungen
 - So 02:00 UTC – Wikipedia-Refresh + Cache-Bereinigung
 
-**Notifications:** Code fertig. Telegram noch nicht konfiguriert (⏳ BOT_TOKEN + CHAT_ID fehlen).
+**Notifications:** Code fertig. `TELEGRAM_BOT_TOKEN` + `TELEGRAM_CHAT_ID` in `.env` eingetragen (Bot muss noch als Admin in den Kanal aufgenommen werden).
 
 ---
 
@@ -92,7 +92,7 @@ Zuletzt aktualisiert: 2026-05-04
 - `src/api/client.ts` – Axios-Client, alle Endpunkte
 - `src/types/api.ts` – TypeScript-Typen (spiegeln schemas.py)
 - Komponenten: `Card`, `PageHeader`, `ZoneBadge`, `ScoreBar`, `DeltaBadge`, `SeverityBadge`
-- `Layout.tsx` – Sidebar mit letztem Scan-Zeitstempel (immer sichtbar, rot bei Fehler)
+- `Layout.tsx` – Responsive: Sidebar auf Desktop (md+), Bottom-Navigation auf Mobile; letzter Scan-Zeitstempel sichtbar, rot bei Fehler
 - **Dashboard** (`/`) – 4 KPI-Karten, Top-5 Zone-1-Signale, Exit-Warnungen, Scan-Trigger, Abbrechen-Button, Fehler-Banner
 - **Watchlist** (`/watchlist`) – Zone-Tabs mit Zählern, sortierbare Tabelle, Kurs mit Währung
 - **Signal-Detail** (`/signal/:ticker`) – Score-Breakdown L1/L2/L3, 30T-Chart (Recharts), OS-Empfehlung, Rescan, Kurs mit Währung
@@ -118,6 +118,8 @@ Zuletzt aktualisiert: 2026-05-04
 - **Scan-Fehler-Banner:** Auf dem Dashboard sichtbar wenn letzter Scan fehlschlug
 - **Letzter Scan in Sidebar:** Immer im Layout sichtbar, rot bei Fehler
 - **Log-Viewer (Config-Tab 6):** Level-Filter, Modul-Filter, Auto-Refresh, erweiterbare Stack-Traces
+- **Responsive UI:** Bottom-Navigation für Mobile (< md), Sidebar auf Desktop; PageHeader stacked auf Mobile; Config-Tabs scrollbar; Dashboard-Button kompakt
+- **Telegram:** `TELEGRAM_BOT_TOKEN` + `TELEGRAM_CHAT_ID` in `.env` konfiguriert
 - **Unit-Tests:** 133 Tests für Scoring-Engine (alle grün)
   - `tests/scoring/test_fundamental.py` – 40 Tests, alle 7 L1-Kriterien
   - `tests/scoring/test_sentiment.py` – 41 Tests, L3-Kriterien + Unterdrückungsregel
@@ -135,7 +137,7 @@ Zuletzt aktualisiert: 2026-05-04
 | Optionsschein-Stammdaten | Kein Free-API → ISIN + KO manuell eintragen |
 | Historisches Sentiment | Für Backtesting: neutral 12,5/25 |
 | Unrealized P&L | Warrant-Preis nicht via API → manuell eintragen |
-| Telegram | BOT_TOKEN + CHAT_ID noch nicht in `.env` eingetragen |
+| Telegram | BOT_TOKEN + CHAT_ID konfiguriert; Bot muss als Admin in Kanal aufgenommen werden |
 | Scoring-Gewichtungen konfigurierbar | In Config-Seite einstellbar, aber Änderungen wirken erst ab nächstem Scan |
 
 ---
@@ -144,6 +146,6 @@ Zuletzt aktualisiert: 2026-05-04
 
 - Telegram-Benachrichtigungen einrichten (BOT_TOKEN + CHAT_ID)
 - Marktkalender-Integration (Feiertage → Scan überspringen)
-- Mobile PWA / Responsive-Optimierung für sehr kleine Screens
+- Mobile PWA (Offline-Unterstützung, App-Icon)
 - Mehrfach-Portfolio (mehrere Nutzerprofile)
 - Erweiterte Backtesting-Auswertung mit P&L-Simulation
