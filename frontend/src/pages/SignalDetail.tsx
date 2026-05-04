@@ -1,3 +1,4 @@
+import React from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { ArrowLeft, RefreshCw } from 'lucide-react'
@@ -20,7 +21,7 @@ function fmtPrice(price: number | null | undefined, currency: string | null | un
   return `${p} ${currency}`
 }
 
-function Row({ label, value, color }: { label: string; value: string | number; color?: string }) {
+function Row({ label, value, color }: { label: string; value: React.ReactNode; color?: string }) {
   return (
     <div className="flex justify-between items-center py-1.5 border-b border-gray-800/60 last:border-0">
       <span className="text-xs text-gray-500">{label}</span>

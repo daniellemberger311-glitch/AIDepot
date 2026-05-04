@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useMutation } from '@tanstack/react-query'
 import { Play } from 'lucide-react'
 import {
-  ResponsiveContainer, ComposedChart, Line, Bar, XAxis, YAxis,
+  ResponsiveContainer, ComposedChart, Line, XAxis, YAxis,
   Tooltip, CartesianGrid, ReferenceLine, Legend,
 } from 'recharts'
 import { runBacktest } from '../api/client'
