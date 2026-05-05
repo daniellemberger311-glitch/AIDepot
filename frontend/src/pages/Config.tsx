@@ -257,7 +257,7 @@ function ScanConfigTab() {
             <div><span className="text-gray-500">Zone-4-Batch:</span> <span className="text-white">{schedule.zone4_batch_size}</span></div>
             <div><span className="text-gray-500">Zone-4-Ticker:</span> <span className="text-white">{schedule.zone4_active_tickers}</span></div>
             <div><span className="text-gray-500">Zyklus-Tage:</span> <span className="text-white">{schedule.zone4_cycle_days ?? '–'}</span></div>
-            <div><span className="text-gray-500">Letzter Scan:</span> <span className="text-white">{schedule.last_scan_completed?.slice(0, 16).replace('T', ' ') ?? '–'} UTC</span></div>
+            <div><span className="text-gray-500">Letzter Scan:</span> <span className="text-white">{schedule.last_scan_completed ? new Date(schedule.last_scan_completed + 'Z').toLocaleString('de-DE', { timeZone: 'Europe/Berlin', day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' }) : '–'}</span></div>
             <div><span className="text-gray-500">Dauer:</span> <span className="text-white">{schedule.last_duration_sec !== null ? `${schedule.last_duration_sec}s` : '–'}</span></div>
           </div>
         </div>
@@ -354,6 +354,11 @@ const LEVEL_BG: Record<string, string> = {
   CRITICAL: 'bg-red-900/25',
 }
 
+function toDeTime(utcIso: string): string {
+  const d = new Date(utcIso.endsWith('Z') ? utcIso : utcIso + 'Z')
+  return d.toLocaleTimeString('de-DE', { timeZone: 'Europe/Berlin', hour: '2-digit', minute: '2-digit', second: '2-digit' })
+}
+
 function LogRow({ entry }: { entry: LogEntry }) {
   const [expanded, setExpanded] = useState(false)
   const isMultiline = entry.message.includes('\n')
@@ -366,7 +371,7 @@ function LogRow({ entry }: { entry: LogEntry }) {
     >
       <div className="flex items-start gap-3 min-w-0">
         <span className="text-gray-600 font-mono text-xs flex-shrink-0 mt-0.5">
-          {entry.timestamp.slice(11, 19)}
+          {toDeTime(entry.timestamp)}
         </span>
         <span className={`text-xs font-semibold w-14 flex-shrink-0 ${LEVEL_COLORS[entry.level]}`}>
           {entry.level}

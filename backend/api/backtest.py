@@ -139,6 +139,7 @@ def start_backtest(
             signals       = events,
             total_signals = summary["total_signals"],
             zone1_entries = summary["zone1_entries"],
+            summary       = summary,
         )
 
     # Längere Zeiträume als Hintergrund-Job

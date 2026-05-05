@@ -1,6 +1,12 @@
 @import "tailwindcss";
 
+/* ── Dark Mode (Standard) ─────────────────────────────────────────────────── */
 :root { color-scheme: dark; }
+
+html, body {
+  height: 100%;
+  overflow: hidden;
+}
 
 body {
   margin: 0;
@@ -11,7 +17,7 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-#root { min-height: 100vh; }
+#root { height: 100%; }
 
 ::-webkit-scrollbar { width: 5px; height: 5px; }
 ::-webkit-scrollbar-track { background: #111827; }
@@ -19,3 +25,53 @@ body {
 
 .scrollbar-none { scrollbar-width: none; -ms-overflow-style: none; }
 .scrollbar-none::-webkit-scrollbar { display: none; }
+
+/* ── Light Mode ──────────────────────────────────────────────────────────── */
+html.light {
+  color-scheme: light;
+}
+html.light body {
+  background: #f8fafc;
+  color: #0f172a;
+}
+html.light ::-webkit-scrollbar-track { background: #e2e8f0; }
+html.light ::-webkit-scrollbar-thumb { background: #94a3b8; }
+
+/* Hintergründe */
+html.light .bg-gray-950  { background-color: #f1f5f9 !important; }
+html.light .bg-gray-900  { background-color: #ffffff !important; }
+html.light .bg-gray-800  { background-color: #f1f5f9 !important; }
+html.light .bg-gray-700  { background-color: #e2e8f0 !important; }
+html.light .bg-gray-800\/20 { background-color: rgba(226,232,240,0.4) !important; }
+html.light .bg-gray-800\/40 { background-color: rgba(226,232,240,0.6) !important; }
+html.light .bg-gray-900\/60 { background-color: rgba(255,255,255,0.8) !important; }
+
+/* Texte */
+html.light .text-white   { color: #0f172a !important; }
+html.light .text-gray-100 { color: #1e293b !important; }
+html.light .text-gray-200 { color: #334155 !important; }
+html.light .text-gray-300 { color: #475569 !important; }
+html.light .text-gray-400 { color: #64748b !important; }
+html.light .text-gray-500 { color: #94a3b8 !important; }
+html.light .text-gray-600 { color: #94a3b8 !important; }
+html.light .text-gray-700 { color: #cbd5e1 !important; }
+
+/* Rahmen */
+html.light .border-gray-800   { border-color: #e2e8f0 !important; }
+html.light .border-gray-700   { border-color: #cbd5e1 !important; }
+html.light .border-gray-800\/50 { border-color: rgba(226,232,240,0.7) !important; }
+html.light .border-gray-800\/60 { border-color: rgba(226,232,240,0.8) !important; }
+html.light .border-t { border-color: #e2e8f0 !important; }
+
+/* Inputs */
+html.light input, html.light select, html.light textarea {
+  background-color: #f8fafc !important;
+  color: #0f172a !important;
+  border-color: #cbd5e1 !important;
+}
+html.light input::placeholder { color: #94a3b8 !important; }
+
+/* Spezifische Komponenten */
+html.light .bg-yellow-900\/10 { background-color: rgba(254,243,199,0.5) !important; }
+html.light .bg-red-900\/15    { background-color: rgba(254,226,226,0.5) !important; }
+html.light .bg-red-900\/25    { background-color: rgba(254,202,202,0.6) !important; }

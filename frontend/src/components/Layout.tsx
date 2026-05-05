@@ -1,8 +1,9 @@
+import { useState } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import {
   LayoutDashboard, Eye, TrendingUp, Briefcase,
-  History, FlaskConical, Settings, Clock,
+  History, FlaskConical, Settings, Clock, Sun, Moon,
 } from 'lucide-react'
 import { fetchScanStatus } from '../api/client'
 
@@ -15,19 +16,37 @@ const NAV = [
   { to: '/config',    icon: Settings,        label: 'Config' },
 ]
 
+function utcToDE(utcStr: string): string {
+  const date = new Date(utcStr.endsWith('Z') ? utcStr : utcStr + 'Z')
+  return date.toLocaleString('de-DE', {
+    timeZone: 'Europe/Berlin',
+    day: '2-digit', month: '2-digit', year: '2-digit',
+    hour: '2-digit', minute: '2-digit',
+  })
+}
+
 export default function Layout() {
+  const [isLight, setIsLight] = useState(
+    () => document.documentElement.classList.contains('light')
+  )
+
   const { data: scanStatus } = useQuery({
     queryKey: ['scanStatus'],
     queryFn: fetchScanStatus,
     refetchInterval: 60_000,
   })
 
-  const lastScan = scanStatus?.last_completed
-    ? scanStatus.last_completed.slice(0, 16).replace('T', ' ')
-    : null
+  const lastScan = scanStatus?.last_completed ?? null
+
+  function toggleTheme() {
+    const next = !isLight
+    document.documentElement.classList.toggle('light', next)
+    localStorage.setItem('theme', next ? 'light' : 'dark')
+    setIsLight(next)
+  }
 
   return (
-    <div className="flex min-h-screen">
+    <div className="flex h-full overflow-hidden">
       {/* Sidebar – nur auf md+ sichtbar */}
       <nav className="hidden md:flex w-14 lg:w-52 flex-shrink-0 flex-col bg-gray-900 border-r border-gray-800 py-4">
         <div className="px-3 mb-6 hidden lg:block">
@@ -57,8 +76,21 @@ export default function Layout() {
           ))}
         </div>
 
-        {/* Letzter Scan */}
-        <div className="mt-auto px-3 pt-4 border-t border-gray-800/60">
+        {/* Theme-Toggle + Letzter Scan */}
+        <div className="mt-auto px-3 pt-4 border-t border-gray-800/60 space-y-3">
+          {/* Theme-Toggle */}
+          <button
+            onClick={toggleTheme}
+            className="flex items-center gap-2 text-gray-500 hover:text-gray-300 transition-colors w-full"
+            title={isLight ? 'Dark Mode' : 'Light Mode'}
+          >
+            {isLight
+              ? <Moon className="w-3.5 h-3.5 flex-shrink-0" />
+              : <Sun  className="w-3.5 h-3.5 flex-shrink-0" />}
+            <span className="text-xs hidden lg:block">{isLight ? 'Dark Mode' : 'Light Mode'}</span>
+          </button>
+
+          {/* Letzter Scan */}
           <div className="items-center gap-2 text-gray-600 hidden lg:flex">
             <Clock className="w-3 h-3 flex-shrink-0" />
             <div className="text-xs leading-tight">
@@ -66,7 +98,7 @@ export default function Layout() {
                 <>
                   <p className="text-gray-600">Letzter Scan</p>
                   <p className={`font-mono ${scanStatus?.error ? 'text-red-500' : 'text-gray-500'}`}>
-                    {lastScan} UTC
+                    {utcToDE(lastScan)}
                   </p>
                 </>
               ) : (
@@ -80,8 +112,8 @@ export default function Layout() {
         </div>
       </nav>
 
-      {/* Hauptinhalt – pb-16 auf Mobile für die Bottom-Nav */}
-      <main className="flex-1 overflow-auto bg-gray-950 pb-16 md:pb-0">
+      {/* Hauptinhalt */}
+      <main className="flex-1 overflow-y-auto overflow-x-hidden bg-gray-950 pb-16 md:pb-0">
         <Outlet />
       </main>
 
@@ -105,6 +137,14 @@ export default function Layout() {
             <span className="text-[10px] leading-none">{label}</span>
           </NavLink>
         ))}
+        {/* Theme-Toggle in Bottom-Nav */}
+        <button
+          onClick={toggleTheme}
+          className="flex flex-col items-center gap-0.5 py-1 px-2 text-gray-500 active:text-gray-300 min-w-[44px]"
+        >
+          {isLight ? <Moon className="w-5 h-5" /> : <Sun className="w-5 h-5" />}
+          <span className="text-[10px] leading-none">{isLight ? 'Dark' : 'Light'}</span>
+        </button>
       </nav>
     </div>
   )

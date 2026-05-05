@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
+import { TrendingUp } from 'lucide-react'
 import { fetchTrades, fetchSignalQuality, fetchHistorySummary } from '../api/client'
 import Card from '../components/Card'
 import PageHeader from '../components/PageHeader'
@@ -17,14 +18,28 @@ export default function History() {
   const { data: summary } = useQuery({ queryKey: ['historySummary'], queryFn: fetchHistorySummary })
 
   const sellTrades = trades.filter(t => t.tx_type === 'SELL')
+  const hasData = sellTrades.length > 0
 
   return (
     <div>
       <PageHeader title="Trade-Archiv" subtitle={summary ? `${summary.total_trades} abgeschlossene Trades` : undefined} />
 
       <div className="p-6 space-y-6">
+        {/* Empty State */}
+        {!hasData && !loadingTrades && (
+          <div className="flex flex-col items-center justify-center py-20 text-center">
+            <div className="w-14 h-14 rounded-full bg-gray-800 flex items-center justify-center mb-4">
+              <TrendingUp className="w-7 h-7 text-gray-600" />
+            </div>
+            <p className="text-gray-400 font-medium">Noch keine abgeschlossenen Trades</p>
+            <p className="text-sm text-gray-600 mt-1 max-w-xs">
+              Sobald du eine Portfolio-Position schließt, erscheinen hier P&L, Win-Rate und Signalqualität.
+            </p>
+          </div>
+        )}
+
         {/* Zusammenfassung */}
-        {summary && (
+        {hasData && summary && (
           <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
             {[
               { label: 'Trades', value: summary.total_trades },
@@ -43,7 +58,7 @@ export default function History() {
           </div>
         )}
 
-        <div className="grid lg:grid-cols-2 gap-6">
+        {hasData && <div className="grid lg:grid-cols-2 gap-6">
           {/* Signalqualität */}
           <Card title="Signalqualität">
             {quality.length === 0 ? (
@@ -89,10 +104,10 @@ export default function History() {
               </div>
             </Card>
           )}
-        </div>
+        </div>}
 
         {/* Trade-Tabelle */}
-        <Card title="Transaktionen">
+        {hasData && <Card title="Transaktionen">
           {loadingTrades ? (
             <p className="text-sm text-gray-500">Lade…</p>
           ) : sellTrades.length === 0 ? (
@@ -129,7 +144,7 @@ export default function History() {
               </table>
             </div>
           )}
-        </Card>
+        </Card>}
       </div>
     </div>
   )
