@@ -28,6 +28,13 @@ def init_db():
     from backend import models  # noqa: F401 – Modelle registrieren
     Base.metadata.create_all(bind=engine)
     _seed_config()
+    _seed_universe()
+
+
+def _seed_universe():
+    from backend.universe.loader import load_static_universe
+    with SessionLocal() as db:
+        load_static_universe(db)
 
 
 def _seed_config():

@@ -37,9 +37,15 @@ function UniverseTab() {
     onSuccess: data => setSearchResults(data),
   })
 
+  const [addError, setAddError] = useState<string | null>(null)
+
   const add = useMutation({
     mutationFn: () => addTicker(newTicker.toUpperCase().trim()),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['universe'] }); setNewTicker('') },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['universe'] }); setNewTicker(''); setAddError(null) },
+    onError: (err: unknown) => {
+      const detail = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail
+      setAddError(detail ?? 'Fehler beim Hinzufügen')
+    },
   })
 
   const deactivate = useMutation({
@@ -62,15 +68,18 @@ function UniverseTab() {
           <label className="text-xs text-gray-500 block mb-1">Ticker hinzufügen</label>
           <div className="flex gap-2">
             <input
-              value={newTicker} onChange={e => setNewTicker(e.target.value.toUpperCase())}
+              value={newTicker}
+              onChange={e => { setNewTicker(e.target.value.toUpperCase()); setAddError(null) }}
+              onKeyDown={e => { if (e.key === 'Enter' && newTicker && !add.isPending) add.mutate() }}
               placeholder="TSLA"
-              className="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500"
+              className={`flex-1 bg-gray-800 border rounded-lg px-3 py-2 text-sm text-white focus:outline-none ${addError ? 'border-red-500 focus:border-red-500' : 'border-gray-700 focus:border-emerald-500'}`}
             />
             <button onClick={() => add.mutate()} disabled={!newTicker || add.isPending}
               className="px-3 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white rounded-lg">
-              <Plus className="w-4 h-4" />
+              {add.isPending ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
             </button>
           </div>
+          {addError && <p className="text-xs text-red-400 mt-1">{addError}</p>}
         </div>
         <div className="flex-1 min-w-[180px]">
           <label className="text-xs text-gray-500 block mb-1">Suchen</label>
