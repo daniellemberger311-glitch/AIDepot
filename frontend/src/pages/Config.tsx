@@ -4,7 +4,7 @@ import { CheckCircle, XCircle, RefreshCw, Plus, Trash2, AlertTriangle, Info } fr
 import {
   fetchConfig, updateConfig, fetchApiStatus, fetchScanSchedule,
   fetchUniverse, searchUniverse, addTicker, deactivateTicker, refreshUniverse,
-  fetchLogs, clearLogs,
+  activateAllTickers, fetchLogs, clearLogs,
 } from '../api/client'
 import type { AppConfig, LogEntry } from '../types/api'
 import Card from '../components/Card'
@@ -58,6 +58,16 @@ function UniverseTab() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['universe'] }),
   })
 
+  const [activateMsg, setActivateMsg] = useState<string | null>(null)
+  const activateAll = useMutation({
+    mutationFn: activateAllTickers,
+    onSuccess: (data) => {
+      qc.invalidateQueries({ queryKey: ['universe'] })
+      setActivateMsg(`${data.activated} Ticker aktiviert – gesamt aktiv: ${data.total_active}`)
+      setTimeout(() => setActivateMsg(null), 5000)
+    },
+  })
+
   const active = universe.filter(u => u.is_active)
   const display = search && searchResults.length ? searchResults : active.slice(0, 50)
 
@@ -100,7 +110,14 @@ function UniverseTab() {
           <RefreshCw className={`w-4 h-4 ${refresh.isPending ? 'animate-spin' : ''}`} />
           Universum aktualisieren
         </button>
+        <button onClick={() => activateAll.mutate()} disabled={activateAll.isPending}
+          className="flex items-center gap-2 px-3 py-2 bg-gray-700 hover:bg-gray-600 disabled:opacity-50 text-white text-sm rounded-lg">
+          <Plus className="w-4 h-4" />
+          Alle aktivieren
+        </button>
       </div>
+
+      {activateMsg && <p className="text-xs text-emerald-400">{activateMsg}</p>}
 
       <div className="text-xs text-gray-500">{active.length} aktive Ticker</div>
 

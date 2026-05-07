@@ -104,6 +104,9 @@ export const deactivateTicker = (ticker: string) =>
 export const refreshUniverse = () =>
   api.post('/universe/refresh').then(r => r.data)
 
+export const activateAllTickers = () =>
+  api.post<{ activated: number; total_active: number }>('/universe/activate-all').then(r => r.data)
+
 // ── Backtesting ────────────────────────────────────────────────────────────
 export const runBacktest = (ticker: string, from_date: string, to_date: string) =>
   api.post<BacktestResult>('/backtest', { ticker, from_date, to_date }).then(r => r.data)

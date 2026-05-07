@@ -13,7 +13,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
-from sqlalchemy import select, func, or_
+from sqlalchemy import select, func, or_, update
 
 from backend.database import get_db
 from backend.models import Stock
@@ -192,6 +192,17 @@ def deactivate_ticker(ticker: str, db: Session = Depends(get_db)):
     stock.is_active = 0
     db.commit()
     logger.info("Ticker %s deaktiviert", ticker.upper())
+
+
+@router.post("/activate-all", summary="Alle inaktiven Ticker aktivieren")
+def activate_all_tickers(db: Session = Depends(get_db)):
+    """Setzt is_active=1 für alle Ticker in der stocks-Tabelle."""
+    result = db.execute(update(Stock).where(Stock.is_active == 0).values(is_active=1))
+    db.commit()
+    count = result.rowcount
+    total = db.query(Stock).filter(Stock.is_active == 1).count()
+    logger.info("%d inaktive Ticker aktiviert – gesamt aktiv: %d", count, total)
+    return {"activated": count, "total_active": total}
 
 
 @router.post("/refresh", summary="Universum aktualisieren")

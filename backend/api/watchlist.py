@@ -2,7 +2,7 @@
 from fastapi import APIRouter, Depends, Query
 from typing import Optional
 from sqlalchemy.orm import Session
-from sqlalchemy import select
+from sqlalchemy import select, func, and_
 
 from backend.database import get_db
 from backend.models import DailyScore, Stock, ScoreBreakdown, OptionsRecommendation
@@ -34,11 +34,6 @@ def get_watchlist(
     - `sort=delta_7d` → nach 7-Tage-Delta absteigend sortieren
     - `breakdown=true` → Score-Aufschlüsselung pro Kriterium einschließen
     """
-    if date is None:
-        date = _latest_score_date(db)
-        if date is None:
-            return []
-
     sort_map = {
         "total_score": DailyScore.total_score.desc(),
         "delta_7d":    DailyScore.delta_7d.desc(),
@@ -46,11 +41,29 @@ def get_watchlist(
         "ticker":      DailyScore.ticker.asc(),
     }
 
-    stmt = (
-        select(DailyScore, Stock.name, Stock.sector)
-        .join(Stock, Stock.ticker == DailyScore.ticker, isouter=True)
-        .where(DailyScore.score_date == date)
-    )
+    if date is not None:
+        # Explizites Datum: nur Scores von diesem Tag
+        stmt = (
+            select(DailyScore, Stock.name, Stock.sector)
+            .join(Stock, Stock.ticker == DailyScore.ticker, isouter=True)
+            .where(DailyScore.score_date == date)
+        )
+    else:
+        # Kein Datum: neuester Score je Ticker (Zone-4-Rotation bleibt sichtbar)
+        latest_sub = (
+            select(DailyScore.ticker, func.max(DailyScore.score_date).label("max_date"))
+            .group_by(DailyScore.ticker)
+            .subquery()
+        )
+        stmt = (
+            select(DailyScore, Stock.name, Stock.sector)
+            .join(Stock, Stock.ticker == DailyScore.ticker, isouter=True)
+            .join(latest_sub, and_(
+                DailyScore.ticker == latest_sub.c.ticker,
+                DailyScore.score_date == latest_sub.c.max_date,
+            ))
+        )
+
     if zone is not None:
         stmt = stmt.where(DailyScore.zone == zone)
     stmt = stmt.order_by(sort_map.get(sort, DailyScore.total_score.desc())).limit(limit)
@@ -62,13 +75,13 @@ def get_watchlist(
         if breakdown:
             bd = db.execute(
                 select(ScoreBreakdown)
-                .where(ScoreBreakdown.ticker == ds.ticker, ScoreBreakdown.score_date == date)
+                .where(ScoreBreakdown.ticker == ds.ticker, ScoreBreakdown.score_date == ds.score_date)
             ).scalar_one_or_none()
         rec = None
         if ds.zone == 1:
             rec = db.execute(
                 select(OptionsRecommendation)
-                .where(OptionsRecommendation.ticker == ds.ticker, OptionsRecommendation.rec_date == date)
+                .where(OptionsRecommendation.ticker == ds.ticker, OptionsRecommendation.rec_date == ds.score_date)
             ).scalar_one_or_none()
         results.append(build_score_out(ds, name, sector, bd, rec))
 
@@ -81,15 +94,27 @@ def get_zone_summary(
     db: Session = Depends(get_db),
 ):
     """Anzahl Aktien pro Zone für das angegebene Datum."""
-    if date is None:
-        date = _latest_score_date(db)
-        if date is None:
+    if date is not None:
+        rows = db.execute(
+            select(DailyScore.zone, DailyScore.ticker)
+            .where(DailyScore.score_date == date)
+        ).all()
+    else:
+        latest_sub = (
+            select(DailyScore.ticker, func.max(DailyScore.score_date).label("max_date"))
+            .group_by(DailyScore.ticker)
+            .subquery()
+        )
+        rows = db.execute(
+            select(DailyScore.zone, DailyScore.ticker)
+            .join(latest_sub, and_(
+                DailyScore.ticker == latest_sub.c.ticker,
+                DailyScore.score_date == latest_sub.c.max_date,
+            ))
+        ).all()
+        if not rows:
             return {"date": None, "zones": {}}
-
-    rows = db.execute(
-        select(DailyScore.zone, DailyScore.ticker)
-        .where(DailyScore.score_date == date)
-    ).all()
+        date = _latest_score_date(db)
 
     zones: dict[int, int] = {1: 0, 2: 0, 3: 0, 4: 0}
     for zone, _ in rows:
