@@ -37,16 +37,19 @@ def _set_config(key: str, value, db: Session) -> None:
     db.commit()
 
 
-def build_scan_queue(db: Session) -> list[str]:
+def build_scan_queue(db: Session) -> list[tuple[str, bool]]:
     """
-    Gibt eine geordnete Ticker-Liste für den heutigen Scan zurück.
+    Gibt eine geordnete Liste von (ticker, quick_scan) Paaren zurück.
+
+    quick_scan=False → vollständige APIs (Finnhub, Marketaux, StockTwits, ApeWisdom)
+    quick_scan=True  → nur yfinance + SimFin (L1/L2 voll, L3 = neutraler Mittelwert 12.5/25)
 
     Reihenfolge:
-      1. Offene Positionen (Tier 0, dedupliziert)
-      2. Zone 1 + Zone 2 (Tier 1)
-      3. Zone 3 (Tier 2)
-      4. Zone 4 – Rotation-Batch (Tier 3)
-      5. Neue Ticker ohne bisherigen Score
+      1. Offene Positionen (Tier 0)  → quick_scan=False
+      2. Zone 1 + Zone 2 (Tier 1)   → quick_scan=False
+      3. Zone 3 (Tier 2)             → quick_scan=False
+      4. Zone 4 – Rotation (Tier 3)  → quick_scan=True
+      5. Neue Ticker                 → quick_scan=True
     """
     today = datetime.utcnow().strftime("%Y-%m-%d")
 
@@ -118,16 +121,23 @@ def build_scan_queue(db: Session) -> list[str]:
     else:
         zone4_batch = []
 
-    # Finale Reihenfolge (Duplikate entfernen, Priorität erhalten)
+    # Finale Reihenfolge: (ticker, quick_scan) – Duplikate entfernen, Priorität erhalten
     seen: set[str] = set()
-    queue: list[str] = []
-    for ticker in open_tickers + tier1 + tier2 + zone4_batch + new_tickers:
+    queue: list[tuple[str, bool]] = []
+
+    for ticker, quick in (
+        [(t, False) for t in open_tickers + tier1 + tier2] +
+        [(t, True)  for t in zone4_batch + new_tickers]
+    ):
         if ticker not in seen:
             seen.add(ticker)
-            queue.append(ticker)
+            queue.append((ticker, quick))
 
+    full_count  = sum(1 for _, q in queue if not q)
+    quick_count = sum(1 for _, q in queue if q)
     logger.info(
-        "Scan-Queue: %d Ticker (T0=%d T1=%d T2=%d T3=%d Neu=%d)",
-        len(queue), len(open_tickers), len(tier1), len(tier2), len(zone4_batch), len(new_tickers),
+        "Scan-Queue: %d Ticker (T0=%d T1=%d T2=%d T3=%d Neu=%d | voll=%d quick=%d)",
+        len(queue), len(open_tickers), len(tier1), len(tier2),
+        len(zone4_batch), len(new_tickers), full_count, quick_count,
     )
     return queue

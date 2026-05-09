@@ -123,22 +123,38 @@ def _save_options_rec(
 
 # ── Hauptfunktion ────────────────────────────────────────────────────────────
 
+_L3_QUICK_SCORE = 12.5
+_L3_QUICK_BD = {
+    "news_sentiment":   4.0,   # Mittelwert aus 0–8
+    "stocktwits_ratio": 3.5,   # Mittelwert aus 0–7
+    "reddit_momentum":  2.5,   # Mittelwert aus 0–5
+    "analyst_delta":    2.5,   # Mittelwert aus 0–5
+    "_fh_score":        None,
+    "_mx_score":        None,
+    "_bullish_ratio":   None,
+    "_mentions":        0,
+    "_mentions_24h":    0,
+}
+
+
 def score_ticker(
     ticker: str,
     db: Session,
     score_date: Optional[str] = None,
+    quick_scan: bool = False,
 ) -> dict:
     """
-    Vollständigen Score für einen Ticker berechnen und in DB schreiben.
-    Gibt das Ergebnis-Dict zurück.
+    Score für einen Ticker berechnen und in DB schreiben.
 
-    Abschluss-Kriterium Phase 2:
-        score_ticker("AAPL", db) schreibt validen Score in alle 4 Tabellen.
+    quick_scan=True: Überspringt Finnhub/Marketaux/StockTwits/ApeWisdom.
+    L1 + L2 laufen vollständig über yfinance/SimFin (kein Rate-Limit).
+    L3 wird auf den neutralen Mittelwert (12.5/25) gesetzt.
+    Geeignet für Zone-4-Massenrotation mit 6000+ Tickern.
     """
     if score_date is None:
         score_date = datetime.utcnow().strftime("%Y-%m-%d")
 
-    logger.info("Scoring %s am %s ...", ticker, score_date)
+    logger.info("Scoring %s am %s (quick=%s)...", ticker, score_date, quick_scan)
 
     # Sicherstellen, dass der Ticker in der stocks-Tabelle existiert
     stock = db.get(Stock, ticker)
@@ -160,11 +176,14 @@ def score_ticker(
         logger.error("L2 (Technical) für %s fehlgeschlagen: %s", ticker, exc)
         l2_score, l2_bd = 0.0, {}
 
-    try:
-        l3_score, l3_bd = compute_sentiment_score(ticker, db)
-    except Exception as exc:
-        logger.error("L3 (Sentiment) für %s fehlgeschlagen: %s", ticker, exc)
-        l3_score, l3_bd = 0.0, {}
+    if quick_scan:
+        l3_score, l3_bd = _L3_QUICK_SCORE, _L3_QUICK_BD.copy()
+    else:
+        try:
+            l3_score, l3_bd = compute_sentiment_score(ticker, db)
+        except Exception as exc:
+            logger.error("L3 (Sentiment) für %s fehlgeschlagen: %s", ticker, exc)
+            l3_score, l3_bd = 0.0, {}
 
     # ── Aggregation ──────────────────────────────────────────────────────────
     total_score, suppressed = apply_suppression_rule(l1_score, l2_score, l3_score)
@@ -279,10 +298,11 @@ def score_ticker_safe(
     ticker: str,
     db: Session,
     score_date: Optional[str] = None,
+    quick_scan: bool = False,
 ) -> Optional[dict]:
     """score_ticker mit vollständiger Fehlerabfangung (für Batch-Scans)."""
     try:
-        return score_ticker(ticker, db, score_date)
+        return score_ticker(ticker, db, score_date, quick_scan=quick_scan)
     except Exception as exc:
         logger.error("score_ticker_safe(%s) fehlgeschlagen: %s", ticker, exc)
         return None

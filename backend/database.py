@@ -52,7 +52,7 @@ def _seed_config():
             ("exit_expiry_weeks",  "3",  "Restlaufzeit-Warnung in Wochen"),
             ("exit_bull_ratio",    "35", "Bullish-Ratio % für Sentiment-Warnung"),
             ("scan_rotation_idx",  "0",  "Rotation-Index für Zone-4-Scan"),
-            ("zone4_daily_count",  "200","Anzahl Zone-4-Aktien pro Scan"),
+            ("zone4_daily_count",  "500","Anzahl Zone-4-Aktien pro Scan (Quick-Scan, kein API-Limit)"),
         ]
         for key, value, desc in defaults:
             db.execute(

@@ -59,18 +59,24 @@ def run_scan(ticker_list: Optional[list[str]] = None) -> None:
 
     try:
         with SessionLocal() as db:
-            tickers = ticker_list or build_scan_queue(db)
-            scan_state["total"] = len(tickers)
-            logger.info("Scan gestartet: %d Ticker", len(tickers))
+            raw_queue = ticker_list or build_scan_queue(db)
+            # Normalisieren: ticker_list ist list[str], build_scan_queue gibt list[(str,bool)]
+            if raw_queue and isinstance(raw_queue[0], str):
+                queue: list[tuple[str, bool]] = [(t, False) for t in raw_queue]
+            else:
+                queue = raw_queue  # type: ignore[assignment]
+
+            scan_state["total"] = len(queue)
+            logger.info("Scan gestartet: %d Ticker", len(queue))
 
             from backend.scoring.orchestrator import score_ticker_safe
-            for i, ticker in enumerate(tickers):
+            for i, (ticker, quick_scan) in enumerate(queue):
                 if scan_state["cancelled"]:
-                    logger.info("Scan manuell abgebrochen nach %d/%d Tickern", i, len(tickers))
-                    scan_state["error"] = f"Manuell abgebrochen nach {i} von {len(tickers)} Tickern"
+                    logger.info("Scan manuell abgebrochen nach %d/%d Tickern", i, len(queue))
+                    scan_state["error"] = f"Manuell abgebrochen nach {i} von {len(queue)} Tickern"
                     break
                 scan_state["current_ticker"] = ticker
-                result = score_ticker_safe(ticker, db)
+                result = score_ticker_safe(ticker, db, quick_scan=quick_scan)
                 scan_state["progress"] = i + 1
                 if result:
                     scan_state["tickers_done"].append(ticker)
