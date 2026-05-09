@@ -112,7 +112,7 @@ export const runBacktest = (ticker: string, from_date: string, to_date: string) 
   api.post<BacktestResult>('/backtest', { ticker, from_date, to_date }).then(r => r.data)
 
 // ── Logs ───────────────────────────────────────────────────────────────────
-export const fetchLogs = (params?: { level?: string; module?: string; limit?: number }) =>
+export const fetchLogs = (params?: { level?: string; module?: string; limit?: number; source?: string }) =>
   api.get<LogResponse>('/logs', { params }).then(r => r.data)
 
 export const clearLogs = () =>

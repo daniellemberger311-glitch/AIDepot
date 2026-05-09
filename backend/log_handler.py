@@ -5,11 +5,14 @@ Wird beim App-Start in main.py an den Root-Logger angehängt.
 Die Einträge sind über GET /api/logs abrufbar.
 """
 import logging
+import os
 from collections import deque
 from datetime import datetime, timezone
+from pathlib import Path
 from threading import Lock
 
-MAX_ENTRIES = 1000
+MAX_ENTRIES = 2000
+LOG_FILE    = Path(os.getenv("AIDEPOT_LOG_FILE", "data/aidepot.log"))
 
 
 class _LogEntry:
@@ -104,22 +107,36 @@ memory_handler.setLevel(logging.DEBUG)
 
 def setup_logging(log_level: str = "INFO") -> None:
     """
-    Root-Logger konfigurieren + MemoryLogHandler anhängen.
+    Root-Logger konfigurieren + MemoryLogHandler + FileHandler anhängen.
     Einmalig beim App-Start aufrufen.
     """
     root = logging.getLogger()
     root.setLevel(logging.DEBUG)
 
+    fmt = logging.Formatter(
+        "%(asctime)s %(levelname)-8s %(name)s – %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    )
+
     # Konsole (INFO und höher)
-    if not any(isinstance(h, logging.StreamHandler) and not isinstance(h, MemoryLogHandler)
+    if not any(isinstance(h, logging.StreamHandler) and not isinstance(h, (MemoryLogHandler, logging.FileHandler))
                for h in root.handlers):
         console = logging.StreamHandler()
         console.setLevel(getattr(logging, log_level.upper(), logging.INFO))
-        console.setFormatter(logging.Formatter(
-            "%(asctime)s %(levelname)-8s %(name)s – %(message)s",
-            datefmt="%Y-%m-%d %H:%M:%S",
-        ))
+        console.setFormatter(fmt)
         root.addHandler(console)
+
+    # Datei-Handler (INFO+, rotiert bei 10 MB, 3 Backups)
+    if not any(isinstance(h, logging.handlers.RotatingFileHandler) for h in root.handlers):
+        try:
+            LOG_FILE.parent.mkdir(parents=True, exist_ok=True)
+            from logging.handlers import RotatingFileHandler
+            fh = RotatingFileHandler(LOG_FILE, maxBytes=10 * 1024 * 1024, backupCount=3, encoding="utf-8")
+            fh.setLevel(logging.INFO)
+            fh.setFormatter(fmt)
+            root.addHandler(fh)
+        except Exception as exc:
+            root.warning("Log-Datei konnte nicht geöffnet werden: %s", exc)
 
     # Memory-Handler (alle Level)
     if memory_handler not in root.handlers:
