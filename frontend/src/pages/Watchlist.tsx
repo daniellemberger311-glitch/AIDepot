@@ -47,7 +47,7 @@ export default function Watchlist() {
   const { data: summary } = useQuery({ queryKey: ['zoneSummary'], queryFn: fetchZoneSummary, refetchInterval: 60_000 })
   const { data: stocks = [], isLoading } = useQuery({
     queryKey: ['watchlist', zone, sort],
-    queryFn: () => fetchWatchlist({ zone: zone || undefined, sort, limit: 500 }),
+    queryFn: () => fetchWatchlist({ zone: zone || undefined, sort, limit: 1000 }),
     refetchInterval: 60_000,
   })
 
@@ -186,7 +186,7 @@ export default function Watchlist() {
               ) : sorted.length === 0 ? (
                 <tr>
                   <td colSpan={11} className="px-4 py-8 text-center text-gray-500">
-                    {search ? `Keine Ergebnisse für „${search}"` : 'Keine Einträge'}
+                    {search ? `Keine Ergebnisse für „${search}“` : 'Keine Einträge'}
                   </td>
                 </tr>
               ) : (
